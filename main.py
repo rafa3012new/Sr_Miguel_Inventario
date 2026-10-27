@@ -59,7 +59,7 @@ def is_missing(v):
     except (TypeError, ValueError):
         pass
     s = str(v).strip()
-    return s == "" or s.lower() in ("nan", "(blank)", "none", "nat")
+    return s == "" or s.lower() in ("nan", "(blank)", "(en blanco)", "none", "nat")
 
 
 def safe_name(s):
@@ -187,13 +187,24 @@ async def handle_key(client, sem, provider, key, progress):
         if key_str in progress:
             return key, progress[key_str]
 
-        query = f"{key[2]} {key[0]} {key[3]}"
-        print(f"[SEARCH] {query}")
+        base_query = f"{key[2]} {key[0]} {key[3]}"
+        # Prioridad: Amazon (Nautica) -> sitio de Nautica -> busqueda general
+        queries = [f"{base_query} site:amazon.com"]
+        if "NAUTICA" in str(key[0]).upper():
+            queries.append(f"{base_query} site:nautica.com")
+            queries.append(f"{base_query} site:nautica.eu")
+        queries.append(f"{base_query} amazon")
+        queries.append(base_query)
+        print(f"[SEARCH] {base_query}")
         urls = []
-        try:
-            urls = await do_search(client, provider, query, MAX_IMAGES)
-        except Exception as e:
-            print(f"  ! search error: {e}")
+        for q in queries:
+            try:
+                urls = await do_search(client, provider, q, MAX_IMAGES)
+            except Exception as e:
+                print(f"  ! search error ({q}): {e}")
+                urls = []
+            if urls:
+                break
 
         filenames = []
         for i, url in enumerate(urls):
