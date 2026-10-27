@@ -169,9 +169,7 @@ pdf_map = extract_pdf_images()
 for _k, _v in extract_pdf_images2().items():
     pdf_map.setdefault(_k, _v)
 
-# Agregar imagenes del XLS sin sobrescribir existentes
-for _k, _v in extract_xls_images().items():
-    pdf_map.setdefault(_k, _v)
+xls_map = extract_xls_images()
 
 df = pd.read_excel(BASE / "Inventario_con_imagenes.xlsx", sheet_name="Data")
 
@@ -208,6 +206,9 @@ def combined_image(r):
     pdf_fname = pdf_map.get(str(r.get("Style", "")).strip(), "")
     if pdf_fname:
         return f"{PDF_IMG_DIR}/{pdf_fname}"
+    xls_fname = xls_map.get(str(r.get("Style", "")).strip(), "")
+    if xls_fname:
+        return xls_fname
     return ""
 
 
