@@ -2112,6 +2112,26 @@ function applyFilters(){
   if(rc) rc.textContent = '(mostrando ' + visible + ' de 5091)';
 }
 input.addEventListener('input', applyFilters);
+
+function openModal(src){
+  const m=document.getElementById('modal');
+  const img=document.getElementById('modalImg');
+  img.src=src;
+  img.style.transform='scale(1)';
+  m.classList.add('open');
+}
+function closeModal(){
+  const m=document.getElementById('modal');
+  const img=document.getElementById('modalImg');
+  m.classList.remove('open');
+  img.src='';
+  img.style.transform='scale(1)';
+}
+function setZoom(z){
+  document.getElementById('modalImg').style.transform='scale('+z+')';
+}
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeModal(); });
+
 // Toggle de paneles de filtro
 document.addEventListener('click', function(e){
   if (e.target && e.target.classList && e.target.classList.contains('filterbtn')){
