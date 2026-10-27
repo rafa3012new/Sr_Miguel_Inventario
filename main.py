@@ -187,7 +187,7 @@ async def handle_key(client, sem, provider, key, progress):
         if key_str in progress:
             return key, progress[key_str]
 
-        base_query = f"{key[2]} {key[0]} {key[3]}"
+        base_query = f"{key[1]} {key[0]} {key[3]}"
         # Prioridad: Amazon (Nautica) -> sitio de Nautica -> busqueda general
         queries = [f"{base_query} site:amazon.com"]
         if "NAUTICA" in str(key[0]).upper():
