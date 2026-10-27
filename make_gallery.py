@@ -246,15 +246,19 @@ def unique_vals(col):
 dropdowns = {}
 for c in cols:
     if c == "#":
-        dropdowns[c] = '<option value="">Todos</option>'
+        dropdowns[c] = ""
         continue
-    opts = ['<option value="">Todos</option>']
     if c == IMAGE_COL:
-        opts += ['<option value="con">Con imagen</option>', '<option value="sin">Sin imagen</option>']
+        vals = ["con", "sin"]
     else:
-        for v in unique_vals(c):
-            opts.append(f'<option value="{html.escape(v, quote=True)}">{html.escape(v)}</option>')
-    dropdowns[c] = "\n".join(opts)
+        vals = unique_vals(c)
+    boxes = []
+    boxes.append(f'<input type="text" class="filtersearch" placeholder="Buscar...">')
+    boxes.append(f'<label class="fitem"><input type="checkbox" class="colchk" data-col="{c}" value="__ALL__" checked> (Todos)</label>')
+    for v in vals:
+        esc = html.escape(str(v), quote=True)
+        boxes.append(f'<label class="fitem"><input type="checkbox" class="colchk" data-col="{c}" value="{esc}" checked> {html.escape(str(v))}</label>')
+    dropdowns[c] = "\n".join(boxes)
 
 rows_html = []
 for i, (_, r) in enumerate(df.iterrows(), start=1):
@@ -310,7 +314,7 @@ for c in cols:
         header_cells.append(f"<th>#</th>")
     else:
         header_cells.append(
-            f"<th>{c}<br><select class='colfilter' data-col='{c}'>{dropdowns[c]}</select></th>"
+            f"<th>{c}<br><button class='filterbtn' data-col='{c}'>Filtrar</button><div class='filterpanel' data-col='{c}' style='display:none'>{dropdowns[c]}</div></th>"
         )
 
 html_doc = f"""<!DOCTYPE html>
@@ -325,6 +329,11 @@ th, td {{ border: 1px solid #ccc; padding: 6px; vertical-align: top; font-size: 
 th {{ background: #333; color: #fff; position: sticky; top: 0; }}
 tr.red {{ background: #ffcccc; }}
 img {{ max-width: 120px; max-height: 120px; object-fit: contain; }}
+th {{ position: relative; }}
+.filterbtn {{ font-size: 11px; padding: 2px 6px; cursor: pointer; }}
+.filterpanel {{ position: absolute; top: 100%; left: 0; z-index: 1000; background: #fff; color: #000; border: 1px solid #ccc; padding: 6px; max-height: 260px; overflow: auto; text-align: left; min-width: 160px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }}
+.fitem {{ display: block; white-space: nowrap; font-size: 11px; color: #000; }}
+.filtersearch {{ width: 95%; margin-bottom: 4px; font-size: 11px; }}
 #search {{ margin-bottom: 10px; padding: 8px; width: 300px; }}
 select.colfilter {{ width: 100%; font-size: 11px; }}
 .thumb {{ cursor: zoom-in; }}
@@ -359,13 +368,26 @@ const input=document.getElementById('search');
 function applyFilters(){{
   const q=input.value.toLowerCase();
   const filters={{}};
-  document.querySelectorAll('select.colfilter').forEach(s=>{{
-    if(s.value) filters[s.dataset.col]=s.value;
+  document.querySelectorAll('.filterpanel').forEach(panel=>{{
+    const col = panel.dataset.col;
+    const boxes = panel.querySelectorAll('.colchk');
+    const checked = [...boxes].filter(b=>b.checked && b.value !== '__ALL__').map(b=>b.value);
+    const allBox = panel.querySelector('.colchk[value="__ALL__"]');
+    if (allBox && allBox.checked) {{
+      // todos seleccionados -> sin filtro
+    }} else if (checked.length === 0) {{
+      filters[col] = new Set(); // nada seleccionado -> ocultar todo
+    }} else {{
+      filters[col] = new Set(checked);
+    }}
   }});
   document.querySelectorAll('#tbl tbody tr').forEach(tr=>{{
     let show = tr.textContent.toLowerCase().includes(q);
     for(const col in filters){{
-      if(tr.getAttribute('data-'+col) !== filters[col]){{ show=false; break; }}
+      const val = tr.getAttribute('data-'+col);
+      if (filters[col] instanceof Set) {{
+        if (filters[col].size === 0 || !filters[col].has(val)) {{ show=false; break; }}
+      }} else if (filters[col] && val !== filters[col]) {{ show=false; break; }}
     }}
     tr.style.display = show ? '' : 'none';
   }});
@@ -374,25 +396,47 @@ function applyFilters(){{
   if(rc) rc.textContent = '(mostrando ' + visible + ' de {len(df)})';
 }}
 input.addEventListener('input', applyFilters);
-document.querySelectorAll('select.colfilter').forEach(s=>s.addEventListener('change', applyFilters));
-function openModal(src){{
-  const m=document.getElementById('modal');
-  const img=document.getElementById('modalImg');
-  img.src=src;
-  img.style.transform='scale(1)';
-  m.classList.add('open');
-}}
-function closeModal(){{
-  const m=document.getElementById('modal');
-  const img=document.getElementById('modalImg');
-  m.classList.remove('open');
-  img.src='';
-  img.style.transform='scale(1)';
-}}
-function setZoom(z){{
-  document.getElementById('modalImg').style.transform='scale('+z+')';
-}}
-document.addEventListener('keydown',function(e){{ if(e.key==='Escape') closeModal(); }});
+// Toggle de paneles de filtro
+document.addEventListener('click', function(e){{
+  if (e.target && e.target.classList && e.target.classList.contains('filterbtn')){{
+    const col = e.target.dataset.col;
+    const panel = document.querySelector('.filterpanel[data-col="'+col+'"]');
+    if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }} else if (!e.target.closest('.filterpanel') && !e.target.classList.contains('filterbtn')){{
+    document.querySelectorAll('.filterpanel').forEach(p=>p.style.display='none');
+  }}
+}});
+// Select-all por columna
+document.addEventListener('change', function(e){{
+  if (e.target && e.target.classList && e.target.classList.contains('colchk') && e.target.value === '__ALL__'){{
+    const col = e.target.dataset.col;
+    const panel = document.querySelector('.filterpanel[data-col="'+col+'"]');
+    if (panel) panel.querySelectorAll('.colchk').forEach(b=>{{ b.checked = e.target.checked; }});
+    applyFilters();
+  }} else if (e.target && e.target.classList && e.target.classList.contains('colchk')){{
+    // sync select-all
+    const col = e.target.dataset.col;
+    const panel = document.querySelector('.filterpanel[data-col="'+col+'"]');
+    if (panel){{
+      const allBox = panel.querySelector('.colchk[value="__ALL__"]');
+      const boxes = [...panel.querySelectorAll('.colchk')].filter(b=>b.value !== '__ALL__');
+      if (allBox) allBox.checked = boxes.every(b=>b.checked);
+    }}
+    applyFilters();
+  }}
+}});
+// Busqueda dentro del panel
+document.addEventListener('input', function(e){{
+  if (e.target && e.target.classList && e.target.classList.contains('filtersearch')){{
+    const panel = e.target.closest('.filterpanel');
+    const q = e.target.value.toLowerCase();
+    panel.querySelectorAll('.fitem').forEach(lbl=>{{
+      const txt = lbl.textContent.toLowerCase();
+      lbl.style.display = txt.includes(q) ? '' : 'none';
+    }});
+  }}
+}});
+
 </script>
 </body>
 </html>
