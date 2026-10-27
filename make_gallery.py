@@ -16,6 +16,7 @@ EXCEL_IMG_DIR = "imagenes_excel"
 PDF_IMG_SRC = "MMX FALL ATS 6.23 LEVY GROUP 3.pdf"
 PDF_IMG_SRC2 = "LAUNDRY EARLY BUY LINESHEET 3.18.pdf"
 PDF_IMG_DIR = "imagenes_pdf"
+XLS_IMG_DIR = "imagenes_xls"
 
 
 def safe_name(s):
@@ -144,10 +145,32 @@ def extract_pdf_images2():
     return mapping
 
 
+def extract_xls_images():
+    out_dir = BASE / XLS_IMG_DIR
+    mapping = {}
+    if not out_dir.exists():
+        return mapping
+    for f in out_dir.iterdir():
+        if not f.is_file():
+            continue
+        name = f.name
+        if not name.startswith("xls_") or not name.lower().endswith((".png", ".jpg", ".jpeg")):
+            continue
+        key = name[4:].rsplit(".", 1)[0]
+        mapping[key] = f"{XLS_IMG_DIR}/{name}"
+    if "V623040" in mapping:
+        mapping.setdefault("V623040A", mapping["V623040"])
+        mapping.setdefault("V623040H", mapping["V623040"])
+    return mapping
+
 image_map = extract_excel_images()
 pdf_map = extract_pdf_images()
 # Agregar imagenes del nuevo PDF sin sobrescribir las existentes
 for _k, _v in extract_pdf_images2().items():
+    pdf_map.setdefault(_k, _v)
+
+# Agregar imagenes del XLS sin sobrescribir existentes
+for _k, _v in extract_xls_images().items():
     pdf_map.setdefault(_k, _v)
 
 df = pd.read_excel(BASE / "Inventario_con_imagenes.xlsx", sheet_name="Data")
@@ -156,6 +179,24 @@ df = pd.read_excel(BASE / "Inventario_con_imagenes.xlsx", sheet_name="Data")
 ORIGINAL_ROWS = 4924
 df["hoja"] = (["sheet2"] * min(ORIGINAL_ROWS, len(df))
               + ["sheet1"] * max(0, len(df) - ORIGINAL_ROWS))
+
+# Columna "Color_Name" mapeada desde Inventario-1.xlsx por Style + Color_code
+try:
+    _inv1 = pd.read_excel(BASE / "Inventario-1.xlsx", sheet_name="Data")
+    _cn = {}
+    for _, _r in _inv1.iterrows():
+        _k = (str(_r.get("Style", "")).strip(), str(_r.get("Color_code", "")).strip().upper())
+        _v = _r.get("Color Name")
+        if _k not in _cn and _v is not None and str(_v).strip() != "" and str(_v).strip().lower() != "nan":
+            _cn[_k] = str(_v).strip()
+    df["Color_Name"] = df.apply(
+        lambda r: _cn.get((str(r.get("Style", "")).strip(),
+                           str(r.get("Color_code", "")).strip().upper()), ""),
+        axis=1,
+    )
+except Exception:
+    df["Color_Name"] = ""
+
 
 
 def combined_image(r):
@@ -172,7 +213,7 @@ def combined_image(r):
 
 df[IMAGE_COL] = df.apply(combined_image, axis=1)
 
-cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Size_Desc", "OTS_INV", "hoja", IMAGE_COL]
+cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", "hoja", IMAGE_COL]
 
 
 def is_red(row):
