@@ -1,0 +1,12 @@
+# Excel temporales de Office
+~$*.xlsx
+*.tmp
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Progreso local (opcional)
+# progress.json
