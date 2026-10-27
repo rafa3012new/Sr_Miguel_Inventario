@@ -14,6 +14,7 @@ IMAGE_COL = "Imagen"
 EXCEL_IMG_SRC = "NAUTICA ATS TOM .xlsx"
 EXCEL_IMG_DIR = "imagenes_excel"
 PDF_IMG_SRC = "MMX FALL ATS 6.23 LEVY GROUP 3.pdf"
+PDF_IMG_SRC2 = "LAUNDRY EARLY BUY LINESHEET 3.18.pdf"
 PDF_IMG_DIR = "imagenes_pdf"
 
 
@@ -97,10 +98,64 @@ def extract_pdf_images():
     return mapping
 
 
+def extract_pdf_images2():
+    src = BASE / PDF_IMG_SRC2
+    out_dir = BASE / PDF_IMG_DIR
+    out_dir.mkdir(exist_ok=True)
+    mapping = {}
+    if pymupdf is None or not src.exists():
+        return mapping
+    doc = pymupdf.open(src)
+    used = set()
+    for pno in range(doc.page_count):
+        page = doc[pno]
+        styles = []
+        for b in page.get_text("blocks"):
+            x0, y0, x1, y1, txt = b[:5]
+            m = re.search(r"\b(\d{7,})\b", txt.strip())
+            if m:
+                styles.append((m.group(1), (x0 + x1) / 2, y0, y1))
+        imgs = []
+        for img in page.get_images(full=True):
+            for r in page.get_image_rects(img[0]):
+                imgs.append((img[0], (r.x0 + r.x1) / 2, r.y0, r.y1))
+        for style, scx, sy0, sy1 in styles:
+            cands = []
+            for xref, icx, iy0, iy1 in imgs:
+                if xref in used:
+                    continue
+                if iy0 >= sy1 - 5 and abs(icx - scx) <= 90:
+                    cands.append((abs(iy0 - sy1) + abs(icx - scx) * 0.5, xref))
+            if cands:
+                cands.sort()
+                xref = cands[0][1]
+                used.add(xref)
+                base = doc.extract_image(xref)
+                ext = base.get("ext", "png")
+                fname = f"pdf_{safe_name(style)}.{ext}"
+                dest = out_dir / fname
+                if not dest.exists():
+                    try:
+                        dest.write_bytes(base["image"])
+                    except Exception:
+                        continue
+                mapping[style] = fname
+    doc.close()
+    return mapping
+
+
 image_map = extract_excel_images()
 pdf_map = extract_pdf_images()
+# Agregar imagenes del nuevo PDF sin sobrescribir las existentes
+for _k, _v in extract_pdf_images2().items():
+    pdf_map.setdefault(_k, _v)
 
 df = pd.read_excel(BASE / "Inventario_con_imagenes.xlsx", sheet_name="Data")
+
+# Columna 'hoja': registros originales (Inventario) = sheet2, nuevos (append de Inventario-1) = sheet1
+ORIGINAL_ROWS = 4924
+df["hoja"] = (["sheet2"] * min(ORIGINAL_ROWS, len(df))
+              + ["sheet1"] * max(0, len(df) - ORIGINAL_ROWS))
 
 
 def combined_image(r):
@@ -117,7 +172,7 @@ def combined_image(r):
 
 df[IMAGE_COL] = df.apply(combined_image, axis=1)
 
-cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Size_Desc", "OTS_INV", IMAGE_COL]
+cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Size_Desc", "OTS_INV", "hoja", IMAGE_COL]
 
 
 def is_red(row):
