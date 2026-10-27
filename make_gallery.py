@@ -468,15 +468,49 @@ document.addEventListener('input', function(e){{
   }}
 }});
 
+// Modal de imagen con zoom
+let zoomLevel = 1;
+function openModal(src){{
+  const modal = document.getElementById('modal');
+  const img = document.getElementById('modalImg');
+  if(!modal || !img) return;
+  img.src = src;
+  zoomLevel = 1;
+  img.style.transform = 'scale(1)';
+  modal.classList.add('open');
+}}
+function closeModal(){{
+  const modal = document.getElementById('modal');
+  const img = document.getElementById('modalImg');
+  if(modal) modal.classList.remove('open');
+  if(img){{ img.src = ''; img.style.transform = 'scale(1)'; }}
+  zoomLevel = 1;
+}}
+function setZoom(z){{
+  zoomLevel = z;
+  const img = document.getElementById('modalImg');
+  if(img) img.style.transform = 'scale(' + z + ')';
+}}
+document.addEventListener('keydown', function(e){{ if(e.key === 'Escape') closeModal(); }});
+const _modalEl = document.getElementById('modal');
+if(_modalEl){{
+  _modalEl.addEventListener('wheel', function(e){{
+    if(!_modalEl.classList.contains('open')) return;
+    e.preventDefault();
+    zoomLevel = Math.min(5, Math.max(1, zoomLevel + (e.deltaY < 0 ? 0.5 : -0.5)));
+    setZoom(zoomLevel);
+  }}, {{ passive: false }});
+}}
+
+
 </script>
 </body>
 </html>
 """
-
 out = BASE / "galeria.html"
 out.write_text(html_doc, encoding="utf-8")
 (BASE / "index.html").write_text(
-    '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+    '<' + '!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
     '<meta http-equiv="refresh" content="0; url=galeria.html">'
     '<title>Galeria de imagenes - Inventario</title></head>'
     '<body><p>Redirigiendo a la <a href="galeria.html">galeria</a>...</p></body></html>',
