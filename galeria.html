@@ -10,6 +10,7 @@ th, td { border: 1px solid #ccc; padding: 6px; vertical-align: top; font-size: 1
 th { background: #333; color: #fff; position: sticky; top: 0; }
 tr.red { background: #ffcccc; }
 img { max-width: 120px; max-height: 120px; object-fit: contain; }
+.sortbtn { cursor: pointer; font-size: 12px; color: #fff; user-select: none; }
 th { position: relative; }
 .filterbtn { font-size: 11px; padding: 2px 6px; cursor: pointer; }
 .filterpanel { position: absolute; top: 100%; left: 0; z-index: 1000; background: #fff; color: #000; border: 1px solid #ccc; padding: 6px; max-height: 260px; overflow: auto; text-align: left; min-width: 160px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
@@ -30,7 +31,7 @@ select.colfilter { width: 100%; font-size: 11px; }
 <h2>Galeria de imagenes - Inventario (5091 filas) <span id="rowCount" style="font-size:13px; font-weight:normal;">(mostrando 5091)</span></h2>
 <input type="text" id="search" placeholder="Buscar texto en toda la fila...">
 <table id="tbl">
-<thead><tr><th>#</th><th>TLGDIV_NAME<br><button class='filterbtn' data-col='TLGDIV_NAME'>Filtrar</button><div class='filterpanel' data-col='TLGDIV_NAME' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
+<thead><tr><th>#</th><th>TLGDIV_NAME <span class='sortbtn' data-col='TLGDIV_NAME' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='TLGDIV_NAME'>Filtrar</button><div class='filterpanel' data-col='TLGDIV_NAME' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
 <label class="fitem"><input type="checkbox" class="colchk" data-col="TLGDIV_NAME" value="__ALL__" checked> (Todos)</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="TLGDIV_NAME" value="HALIFAX WOMENS" checked> HALIFAX WOMENS</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="TLGDIV_NAME" value="LAUNDRY BY DESIGN" checked> LAUNDRY BY DESIGN</label>
@@ -39,7 +40,7 @@ select.colfilter { width: 100%; font-size: 11px; }
 <label class="fitem"><input type="checkbox" class="colchk" data-col="TLGDIV_NAME" value="SAGE COLLECTIVE OUTERWEAR" checked> SAGE COLLECTIVE OUTERWEAR</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="TLGDIV_NAME" value="T TAHARI" checked> T TAHARI</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="TLGDIV_NAME" value="Total general" checked> Total general</label>
-<label class="fitem"><input type="checkbox" class="colchk" data-col="TLGDIV_NAME" value="(en blanco)" checked> (en blanco)</label></div></th><th>Style<br><button class='filterbtn' data-col='Style'>Filtrar</button><div class='filterpanel' data-col='Style' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
+<label class="fitem"><input type="checkbox" class="colchk" data-col="TLGDIV_NAME" value="(en blanco)" checked> (en blanco)</label></div></th><th>Style <span class='sortbtn' data-col='Style' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='Style'>Filtrar</button><div class='filterpanel' data-col='Style' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style" value="__ALL__" checked> (Todos)</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style" value="119000008" checked> 119000008</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style" value="119000214" checked> 119000214</label>
@@ -586,7 +587,7 @@ select.colfilter { width: 100%; font-size: 11px; }
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style" value="107010326" checked> 107010326</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style" value="117001922" checked> 117001922</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style" value="" checked> </label>
-<label class="fitem"><input type="checkbox" class="colchk" data-col="Style" value="(en blanco)" checked> (en blanco)</label></div></th><th>Style_Name<br><button class='filterbtn' data-col='Style_Name'>Filtrar</button><div class='filterpanel' data-col='Style_Name' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
+<label class="fitem"><input type="checkbox" class="colchk" data-col="Style" value="(en blanco)" checked> (en blanco)</label></div></th><th>Style_Name <span class='sortbtn' data-col='Style_Name' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='Style_Name'>Filtrar</button><div class='filterpanel' data-col='Style_Name' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style_Name" value="__ALL__" checked> (Todos)</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style_Name" value="Midweight Faux Fur Trimmed Puffer CBL:31" checked> Midweight Faux Fur Trimmed Puffer CBL:31</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style_Name" value="Softshell B/T Mellowpile Jacket CBL 26" checked> Softshell B/T Mellowpile Jacket CBL 26</label>
@@ -1048,7 +1049,7 @@ WITH FILL</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style_Name" value="RAIN" checked> RAIN</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style_Name" value="26.5 SOFT TECH PUFFER" checked> 26.5 SOFT TECH PUFFER</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Style_Name" value="" checked> </label>
-<label class="fitem"><input type="checkbox" class="colchk" data-col="Style_Name" value="(en blanco)" checked> (en blanco)</label></div></th><th>Color_code<br><button class='filterbtn' data-col='Color_code'>Filtrar</button><div class='filterpanel' data-col='Color_code' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
+<label class="fitem"><input type="checkbox" class="colchk" data-col="Style_Name" value="(en blanco)" checked> (en blanco)</label></div></th><th>Color_code <span class='sortbtn' data-col='Color_code' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='Color_code'>Filtrar</button><div class='filterpanel' data-col='Color_code' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_code" value="__ALL__" checked> (Todos)</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_code" value="BLK" checked> BLK</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_code" value="ESP" checked> ESP</label>
@@ -1285,7 +1286,7 @@ WITH FILL</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_code" value="NWB" checked> NWB</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_code" value="" checked> </label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_code" value="BDN" checked> BDN</label>
-<label class="fitem"><input type="checkbox" class="colchk" data-col="Color_code" value="(en blanco)" checked> (en blanco)</label></div></th><th>Color_Name<br><button class='filterbtn' data-col='Color_Name'>Filtrar</button><div class='filterpanel' data-col='Color_Name' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
+<label class="fitem"><input type="checkbox" class="colchk" data-col="Color_code" value="(en blanco)" checked> (en blanco)</label></div></th><th>Color_Name <span class='sortbtn' data-col='Color_Name' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='Color_Name'>Filtrar</button><div class='filterpanel' data-col='Color_Name' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_Name" value="__ALL__" checked> (Todos)</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_Name" value="BLACK" checked> BLACK</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_Name" value="ESPRESSO" checked> ESPRESSO</label>
@@ -1510,7 +1511,7 @@ WITH FILL</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_Name" value="RED/GREY" checked> RED/GREY</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_Name" value="NEW BURGUNDY" checked> NEW BURGUNDY</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Color_Name" value="" checked> </label>
-<label class="fitem"><input type="checkbox" class="colchk" data-col="Color_Name" value="BLUDENIM" checked> BLUDENIM</label></div></th><th>Size_Desc<br><button class='filterbtn' data-col='Size_Desc'>Filtrar</button><div class='filterpanel' data-col='Size_Desc' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
+<label class="fitem"><input type="checkbox" class="colchk" data-col="Color_Name" value="BLUDENIM" checked> BLUDENIM</label></div></th><th>Size_Desc <span class='sortbtn' data-col='Size_Desc' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='Size_Desc'>Filtrar</button><div class='filterpanel' data-col='Size_Desc' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Size_Desc" value="__ALL__" checked> (Todos)</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Size_Desc" value="PPK" checked> PPK</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Size_Desc" value="L" checked> L</label>
@@ -1555,7 +1556,7 @@ WITH FILL</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Size_Desc" value="MP" checked> MP</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Size_Desc" value="OS" checked> OS</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Size_Desc" value="" checked> </label>
-<label class="fitem"><input type="checkbox" class="colchk" data-col="Size_Desc" value="(en blanco)" checked> (en blanco)</label></div></th><th>OTS_INV<br><button class='filterbtn' data-col='OTS_INV'>Filtrar</button><div class='filterpanel' data-col='OTS_INV' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
+<label class="fitem"><input type="checkbox" class="colchk" data-col="Size_Desc" value="(en blanco)" checked> (en blanco)</label></div></th><th>OTS_INV <span class='sortbtn' data-col='OTS_INV' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='OTS_INV'>Filtrar</button><div class='filterpanel' data-col='OTS_INV' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
 <label class="fitem"><input type="checkbox" class="colchk" data-col="OTS_INV" value="__ALL__" checked> (Todos)</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="OTS_INV" value="0" checked> 0</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="OTS_INV" value="1" checked> 1</label>
@@ -2037,10 +2038,10 @@ WITH FILL</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="OTS_INV" value="6762" checked> 6762</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="OTS_INV" value="15592" checked> 15592</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="OTS_INV" value="475507" checked> 475507</label>
-<label class="fitem"><input type="checkbox" class="colchk" data-col="OTS_INV" value="" checked> </label></div></th><th>hoja<br><button class='filterbtn' data-col='hoja'>Filtrar</button><div class='filterpanel' data-col='hoja' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
+<label class="fitem"><input type="checkbox" class="colchk" data-col="OTS_INV" value="" checked> </label></div></th><th>hoja <span class='sortbtn' data-col='hoja' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='hoja'>Filtrar</button><div class='filterpanel' data-col='hoja' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
 <label class="fitem"><input type="checkbox" class="colchk" data-col="hoja" value="__ALL__" checked> (Todos)</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="hoja" value="sheet2" checked> sheet2</label>
-<label class="fitem"><input type="checkbox" class="colchk" data-col="hoja" value="sheet1" checked> sheet1</label></div></th><th>Imagen<br><button class='filterbtn' data-col='Imagen'>Filtrar</button><div class='filterpanel' data-col='Imagen' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
+<label class="fitem"><input type="checkbox" class="colchk" data-col="hoja" value="sheet1" checked> sheet1</label></div></th><th>Imagen <span class='sortbtn' data-col='Imagen' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='Imagen'>Filtrar</button><div class='filterpanel' data-col='Imagen' style='display:none'><input type="text" class="filtersearch" placeholder="Buscar...">
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Imagen" value="__ALL__" checked> (Todos)</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Imagen" value="con" checked> con</label>
 <label class="fitem"><input type="checkbox" class="colchk" data-col="Imagen" value="sin" checked> sin</label></div></th></tr></thead>
@@ -2080,6 +2081,7 @@ WITH FILL</td><td>TRU</td><td>TRUE BLACK</td><td>S</td><td>12</td><td>sheet2</td
   </div>
 </div>
 <script>
+const COLS = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", "hoja", "Imagen"];
 const input=document.getElementById('search');
 function applyFilters(){
   const q=input.value.toLowerCase();
@@ -2113,24 +2115,29 @@ function applyFilters(){
 }
 input.addEventListener('input', applyFilters);
 
-function openModal(src){
-  const m=document.getElementById('modal');
-  const img=document.getElementById('modalImg');
-  img.src=src;
-  img.style.transform='scale(1)';
-  m.classList.add('open');
+let sortState = { col: null, asc: true };
+function sortTable(btn){
+  const col = btn.dataset.col;
+  const asc = (sortState.col === col) ? !sortState.asc : true;
+  sortState = { col: col, asc: asc };
+  const tbody = document.querySelector('#tbl tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const idx = COLS.indexOf(col);
+  if (idx < 0) return;
+  rows.sort(function(a,b){
+    const va = (a.cells[idx] ? a.cells[idx].textContent : '').trim();
+    const vb = (b.cells[idx] ? b.cells[idx].textContent : '').trim();
+    const na = parseFloat(va.replace(/,/g,''));
+    const nb = parseFloat(vb.replace(/,/g,''));
+    if (!isNaN(na) && !isNaN(nb)) return asc ? (na - nb) : (nb - na);
+    return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
+  rows.forEach(function(r){ tbody.appendChild(r); });
+  document.querySelectorAll('.sortbtn').forEach(function(b){ b.textContent = '↕'; });
+  btn.textContent = asc ? '▲' : '▼';
+  applyFilters();
 }
-function closeModal(){
-  const m=document.getElementById('modal');
-  const img=document.getElementById('modalImg');
-  m.classList.remove('open');
-  img.src='';
-  img.style.transform='scale(1)';
-}
-function setZoom(z){
-  document.getElementById('modalImg').style.transform='scale('+z+')';
-}
-document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeModal(); });
+
 
 // Toggle de paneles de filtro
 document.addEventListener('click', function(e){
@@ -2138,25 +2145,24 @@ document.addEventListener('click', function(e){
     const col = e.target.dataset.col;
     const panel = document.querySelector('.filterpanel[data-col="'+col+'"]');
     if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-  } else if (!e.target.closest('.filterpanel') && !e.target.classList.contains('filterbtn')){
-    document.querySelectorAll('.filterpanel').forEach(p=>p.style.display='none');
+  } else if (!e.target.closest('.filterpanel') && !(e.target.classList && e.target.classList.contains('filterbtn'))){
+    document.querySelectorAll('.filterpanel').forEach(function(p){ p.style.display='none'; });
   }
 });
-// Select-all por columna
+// Select-all y cambio por checkbox
 document.addEventListener('change', function(e){
   if (e.target && e.target.classList && e.target.classList.contains('colchk') && e.target.value === '__ALL__'){
     const col = e.target.dataset.col;
     const panel = document.querySelector('.filterpanel[data-col="'+col+'"]');
-    if (panel) panel.querySelectorAll('.colchk').forEach(b=>{ b.checked = e.target.checked; });
+    if (panel) panel.querySelectorAll('.colchk').forEach(function(b){ b.checked = e.target.checked; });
     applyFilters();
   } else if (e.target && e.target.classList && e.target.classList.contains('colchk')){
-    // sync select-all
     const col = e.target.dataset.col;
     const panel = document.querySelector('.filterpanel[data-col="'+col+'"]');
     if (panel){
       const allBox = panel.querySelector('.colchk[value="__ALL__"]');
-      const boxes = [...panel.querySelectorAll('.colchk')].filter(b=>b.value !== '__ALL__');
-      if (allBox) allBox.checked = boxes.every(b=>b.checked);
+      const boxes = [...panel.querySelectorAll('.colchk')].filter(function(b){ return b.value !== '__ALL__'; });
+      if (allBox) allBox.checked = boxes.every(function(b){ return b.checked; });
     }
     applyFilters();
   }
@@ -2166,7 +2172,7 @@ document.addEventListener('input', function(e){
   if (e.target && e.target.classList && e.target.classList.contains('filtersearch')){
     const panel = e.target.closest('.filterpanel');
     const q = e.target.value.toLowerCase();
-    panel.querySelectorAll('.fitem').forEach(lbl=>{
+    panel.querySelectorAll('.fitem').forEach(function(lbl){
       const txt = lbl.textContent.toLowerCase();
       lbl.style.display = txt.includes(q) ? '' : 'none';
     });

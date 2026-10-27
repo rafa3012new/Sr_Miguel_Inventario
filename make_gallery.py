@@ -319,7 +319,7 @@ for c in cols:
         header_cells.append(f"<th>#</th>")
     else:
         header_cells.append(
-            f"<th>{c}<br><button class='filterbtn' data-col='{c}'>Filtrar</button><div class='filterpanel' data-col='{c}' style='display:none'>{dropdowns[c]}</div></th>"
+            f"<th>{c} <span class='sortbtn' data-col='{c}' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='{c}'>Filtrar</button><div class='filterpanel' data-col='{c}' style='display:none'>{dropdowns[c]}</div></th>"
         )
 
 html_doc = f"""<!DOCTYPE html>
@@ -334,6 +334,7 @@ th, td {{ border: 1px solid #ccc; padding: 6px; vertical-align: top; font-size: 
 th {{ background: #333; color: #fff; position: sticky; top: 0; }}
 tr.red {{ background: #ffcccc; }}
 img {{ max-width: 120px; max-height: 120px; object-fit: contain; }}
+.sortbtn {{ cursor: pointer; font-size: 12px; color: #fff; user-select: none; }}
 th {{ position: relative; }}
 .filterbtn {{ font-size: 11px; padding: 2px 6px; cursor: pointer; }}
 .filterpanel {{ position: absolute; top: 100%; left: 0; z-index: 1000; background: #fff; color: #000; border: 1px solid #ccc; padding: 6px; max-height: 260px; overflow: auto; text-align: left; min-width: 160px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }}
@@ -369,6 +370,7 @@ select.colfilter {{ width: 100%; font-size: 11px; }}
   </div>
 </div>
 <script>
+const COLS = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", "hoja", "Imagen"];
 const input=document.getElementById('search');
 function applyFilters(){{
   const q=input.value.toLowerCase();
@@ -402,24 +404,29 @@ function applyFilters(){{
 }}
 input.addEventListener('input', applyFilters);
 
-function openModal(src){{
-  const m=document.getElementById('modal');
-  const img=document.getElementById('modalImg');
-  img.src=src;
-  img.style.transform='scale(1)';
-  m.classList.add('open');
+let sortState = {{ col: null, asc: true }};
+function sortTable(btn){{
+  const col = btn.dataset.col;
+  const asc = (sortState.col === col) ? !sortState.asc : true;
+  sortState = {{ col: col, asc: asc }};
+  const tbody = document.querySelector('#tbl tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const idx = COLS.indexOf(col);
+  if (idx < 0) return;
+  rows.sort(function(a,b){{
+    const va = (a.cells[idx] ? a.cells[idx].textContent : '').trim();
+    const vb = (b.cells[idx] ? b.cells[idx].textContent : '').trim();
+    const na = parseFloat(va.replace(/,/g,''));
+    const nb = parseFloat(vb.replace(/,/g,''));
+    if (!isNaN(na) && !isNaN(nb)) return asc ? (na - nb) : (nb - na);
+    return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+  }});
+  rows.forEach(function(r){{ tbody.appendChild(r); }});
+  document.querySelectorAll('.sortbtn').forEach(function(b){{ b.textContent = '\u2195'; }});
+  btn.textContent = asc ? '\u25B2' : '\u25BC';
+  applyFilters();
 }}
-function closeModal(){{
-  const m=document.getElementById('modal');
-  const img=document.getElementById('modalImg');
-  m.classList.remove('open');
-  img.src='';
-  img.style.transform='scale(1)';
-}}
-function setZoom(z){{
-  document.getElementById('modalImg').style.transform='scale('+z+')';
-}}
-document.addEventListener('keydown',function(e){{ if(e.key==='Escape') closeModal(); }});
+
 
 // Toggle de paneles de filtro
 document.addEventListener('click', function(e){{
@@ -427,25 +434,24 @@ document.addEventListener('click', function(e){{
     const col = e.target.dataset.col;
     const panel = document.querySelector('.filterpanel[data-col="'+col+'"]');
     if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-  }} else if (!e.target.closest('.filterpanel') && !e.target.classList.contains('filterbtn')){{
-    document.querySelectorAll('.filterpanel').forEach(p=>p.style.display='none');
+  }} else if (!e.target.closest('.filterpanel') && !(e.target.classList && e.target.classList.contains('filterbtn'))){{
+    document.querySelectorAll('.filterpanel').forEach(function(p){{ p.style.display='none'; }});
   }}
 }});
-// Select-all por columna
+// Select-all y cambio por checkbox
 document.addEventListener('change', function(e){{
   if (e.target && e.target.classList && e.target.classList.contains('colchk') && e.target.value === '__ALL__'){{
     const col = e.target.dataset.col;
     const panel = document.querySelector('.filterpanel[data-col="'+col+'"]');
-    if (panel) panel.querySelectorAll('.colchk').forEach(b=>{{ b.checked = e.target.checked; }});
+    if (panel) panel.querySelectorAll('.colchk').forEach(function(b){{ b.checked = e.target.checked; }});
     applyFilters();
   }} else if (e.target && e.target.classList && e.target.classList.contains('colchk')){{
-    // sync select-all
     const col = e.target.dataset.col;
     const panel = document.querySelector('.filterpanel[data-col="'+col+'"]');
     if (panel){{
       const allBox = panel.querySelector('.colchk[value="__ALL__"]');
-      const boxes = [...panel.querySelectorAll('.colchk')].filter(b=>b.value !== '__ALL__');
-      if (allBox) allBox.checked = boxes.every(b=>b.checked);
+      const boxes = [...panel.querySelectorAll('.colchk')].filter(function(b){{ return b.value !== '__ALL__'; }});
+      if (allBox) allBox.checked = boxes.every(function(b){{ return b.checked; }});
     }}
     applyFilters();
   }}
@@ -455,7 +461,7 @@ document.addEventListener('input', function(e){{
   if (e.target && e.target.classList && e.target.classList.contains('filtersearch')){{
     const panel = e.target.closest('.filterpanel');
     const q = e.target.value.toLowerCase();
-    panel.querySelectorAll('.fitem').forEach(lbl=>{{
+    panel.querySelectorAll('.fitem').forEach(function(lbl){{
       const txt = lbl.textContent.toLowerCase();
       lbl.style.display = txt.includes(q) ? '' : 'none';
     }});
