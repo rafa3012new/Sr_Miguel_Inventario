@@ -1,23 +1,29 @@
 import html
+import re
 import pandas as pd
 from pathlib import Path
 from openpyxl import load_workbook
+
+try:
+    import pymupdf
+except Exception:
+    pymupdf = None
 
 BASE = Path(__file__).resolve().parent
 IMAGE_COL = "Imagen"
 EXCEL_IMG_SRC = "NAUTICA ATS TOM .xlsx"
 EXCEL_IMG_DIR = "imagenes_excel"
+PDF_IMG_SRC = "MMX FALL ATS 6.23 LEVY GROUP 3.pdf"
+PDF_IMG_DIR = "imagenes_pdf"
 
 
 def safe_name(s):
-    import re
-    s = re.sub(r'[\\\\/*?:"<>|]', "_", str(s))
+    s = re.sub(r'[\\/*?:"<>|]', "_", str(s))
     s = re.sub(r"\s+", "_", s).strip("_")
     return (s[:50] or "item")
 
 
 def extract_excel_images():
-    """Extract embedded images from the Excel and map (TLGDIV, Style) -> filename."""
     src = BASE / EXCEL_IMG_SRC
     out_dir = BASE / EXCEL_IMG_DIR
     out_dir.mkdir(exist_ok=True)
@@ -51,15 +57,66 @@ def extract_excel_images():
     return mapping
 
 
+def extract_pdf_images():
+    src = BASE / PDF_IMG_SRC
+    out_dir = BASE / PDF_IMG_DIR
+    out_dir.mkdir(exist_ok=True)
+    mapping = {}
+    if pymupdf is None or not src.exists():
+        return mapping
+    doc = pymupdf.open(src)
+    candidates = {}
+    for pno in range(doc.page_count):
+        page = doc[pno]
+        style_blocks = []
+        for b in page.get_text("blocks"):
+            x0, y0, x1, y1, txt = b[:5]
+            txt = txt.strip()
+            m = re.search(r"\b(\d{7,})\b", txt)
+            if m and x0 > 180:
+                style_blocks.append((y0, y1, m.group(1)))
+        for img in page.get_images(full=True):
+            for r in page.get_image_rects(img[0]):
+                styles = {sb[2] for sb in style_blocks if not (sb[1] < r.y0 or sb[0] > r.y1)}
+                for st in styles:
+                    candidates.setdefault(st, []).append((r.x0, r.y0, img[0]))
+    for style, cands in candidates.items():
+        cands_sorted = sorted(cands, key=lambda c: (c[0], c[1]))
+        _, _, xref = cands_sorted[0]
+        base = doc.extract_image(xref)
+        ext = base.get("ext", "png")
+        fname = f"pdf_{safe_name(style)}.{ext}"
+        dest = out_dir / fname
+        if not dest.exists():
+            try:
+                dest.write_bytes(base["image"])
+            except Exception:
+                continue
+        mapping[style] = fname
+    doc.close()
+    return mapping
+
+
 image_map = extract_excel_images()
+pdf_map = extract_pdf_images()
 
 df = pd.read_excel(BASE / "Inventario_con_imagenes.xlsx", sheet_name="Data")
-df[IMAGE_COL] = df.apply(
-    lambda r: image_map.get(
+
+
+def combined_image(r):
+    excel_fname = image_map.get(
         (str(r.get("TLGDIV_NAME", "")).strip(), str(r.get("Style", "")).strip()), ""
-    ),
-    axis=1,
-)
+    )
+    if excel_fname:
+        return f"{EXCEL_IMG_DIR}/{excel_fname}"
+    pdf_fname = pdf_map.get(str(r.get("Style", "")).strip(), "")
+    if pdf_fname:
+        return f"{PDF_IMG_DIR}/{pdf_fname}"
+    return ""
+
+
+df[IMAGE_COL] = df.apply(combined_image, axis=1)
+
 cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Size_Desc", "OTS_INV", IMAGE_COL]
 
 
@@ -90,27 +147,18 @@ def unique_vals(col):
     return vals
 
 
-filter_panels = {}
+dropdowns = {}
 for c in cols:
     if c == "#":
-        filter_panels[c] = ""
+        dropdowns[c] = '<option value="">Todos</option>'
         continue
-    vals = unique_vals(c)
-    cbs = []
-    for v in vals:
-        ev = html.escape(v, quote=True)
-        cbs.append(f'<label class="fp-item"><input type="checkbox" class="chk-val" data-col="{c}" value="{ev}" checked> {html.escape(v)}</label>')
-    panel = (
-        f'<div class="filter-wrap">'
-        f'<button class="filter-btn" data-col="{c}" onclick="toggleFilter(\'{c}\')">&#9660;</button>'
-        f'<div class="filter-panel" id="fp-{c}" data-col="{c}" style="display:none;">'
-        f'<label class="fp-item"><input type="checkbox" class="chk-all" data-col="{c}" checked> (Todos)</label>'
-        f'<div class="fp-list">{"".join(cbs)}</div>'
-        f'<div class="fp-actions"><button onclick="applyFilters()">Aplicar</button>'
-        f'<button onclick="clearFilter(\'{c}\')">Limpiar</button></div>'
-        f'</div></div>'
-    )
-    filter_panels[c] = panel
+    opts = ['<option value="">Todos</option>']
+    if c == IMAGE_COL:
+        opts += ['<option value="con">Con imagen</option>', '<option value="sin">Sin imagen</option>']
+    else:
+        for v in unique_vals(c):
+            opts.append(f'<option value="{html.escape(v, quote=True)}">{html.escape(v)}</option>')
+    dropdowns[c] = "\n".join(opts)
 
 rows_html = []
 for i, (_, r) in enumerate(df.iterrows(), start=1):
@@ -132,10 +180,10 @@ for i, (_, r) in enumerate(df.iterrows(), start=1):
                     s = str(int(f)) if f.is_integer() else str(f)
                 except (ValueError, TypeError):
                     s = str(val).strip()
+            elif c == IMAGE_COL:
+                s = "con" if (val is not None and str(val).strip() != "" and not (isinstance(val, float) and pd.isna(val))) else "sin"
             else:
                 s = str(val).strip()
-            if c == IMAGE_COL:
-                s = "con" if s else "sin"
         data_attrs.append(f'data-{c}="{html.escape(s, quote=True)}"')
     for c in cols:
         if c == "#":
@@ -144,7 +192,7 @@ for i, (_, r) in enumerate(df.iterrows(), start=1):
         val = r.get(c)
         if c == IMAGE_COL and isinstance(val, str) and val.strip():
             _v = html.escape(str(val), quote=True)
-            img = f'<img src="{EXCEL_IMG_DIR}/{_v}" loading="lazy" alt="{html.escape(str(val))}" class="thumb" data-full="{EXCEL_IMG_DIR}/{_v}" onclick="openModal(this.dataset.full)" onerror="this.style.display=\'none\'">'
+            img = f'<img src="{_v}" loading="lazy" alt="{html.escape(str(val))}" class="thumb" data-full="{_v}" onclick="openModal(this.dataset.full)" onerror="this.style.display=\'none\'">'
             cells.append(f"<td>{img}<br><small>{html.escape(str(val))}</small></td>")
         else:
             if val is None or (isinstance(val, float) and pd.isna(val)):
@@ -165,9 +213,11 @@ for c in cols:
     if c == "#":
         header_cells.append(f"<th>#</th>")
     else:
-        header_cells.append(f"<th>{c}<br>{filter_panels[c]}</th>")
+        header_cells.append(
+            f"<th>{c}<br><select class='colfilter' data-col='{c}'>{dropdowns[c]}</select></th>"
+        )
 
-html = f"""<!DOCTYPE html>
+html_doc = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -180,14 +230,8 @@ th {{ background: #333; color: #fff; position: sticky; top: 0; }}
 tr.red {{ background: #ffcccc; }}
 img {{ max-width: 120px; max-height: 120px; object-fit: contain; }}
 #search {{ margin-bottom: 10px; padding: 8px; width: 300px; }}
+select.colfilter {{ width: 100%; font-size: 11px; }}
 .thumb {{ cursor: zoom-in; }}
-.filter-wrap {{ position: relative; display: inline-block; }}
-.filter-btn {{ cursor: pointer; border: 1px solid #888; background: #fff; font-size: 11px; padding: 2px 6px; border-radius: 3px; }}
-.filter-panel {{ position: absolute; top: 100%; left: 0; background: #fff; color: #000; border: 1px solid #ccc; padding: 8px; max-height: 280px; overflow: auto; z-index: 100; min-width: 200px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }}
-.fp-item {{ display: block; white-space: nowrap; font-size: 12px; margin: 2px 0; }}
-.fp-list {{ max-height: 190px; overflow: auto; margin: 6px 0; border-top: 1px solid #eee; border-bottom: 1px solid #eee; padding: 4px 0; }}
-.fp-actions {{ display: flex; gap: 6px; margin-top: 6px; }}
-.fp-actions button {{ font-size: 11px; cursor: pointer; }}
 .modal {{ display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }}
 .modal.open {{ display: flex; }}
 .modal img {{ max-width: 90vw; max-height: 75vh; transition: transform .15s ease; transform-origin: center center; }}
@@ -197,7 +241,7 @@ img {{ max-width: 120px; max-height: 120px; object-fit: contain; }}
 </style>
 </head>
 <body>
-<h2>Galeria de imagenes - Inventario ({len(df)} filas)</h2>
+<h2>Galeria de imagenes - Inventario ({len(df)} filas) <span id="rowCount" style="font-size:13px; font-weight:normal;">(mostrando {len(df)})</span></h2>
 <input type="text" id="search" placeholder="Buscar texto en toda la fila...">
 <table id="tbl">
 <thead><tr>{''.join(header_cells)}</tr></thead>
@@ -216,58 +260,25 @@ img {{ max-width: 120px; max-height: 120px; object-fit: contain; }}
 </div>
 <script>
 const input=document.getElementById('search');
-function toggleFilter(col){{
-  document.querySelectorAll('.filter-panel').forEach(p=>{{ if(p.id!=='fp-'+col) p.style.display='none'; }});
-  const p=document.getElementById('fp-'+col);
-  if(p) p.style.display = p.style.display==='none'?'block':'none';
-}}
-function clearFilter(col){{
-  document.querySelectorAll('.chk-val[data-col="'+col+'"]').forEach(v=>v.checked=true);
-  const all=document.querySelector('.chk-all[data-col="'+col+'"]');
-  if(all) all.checked=true;
-  applyFilters();
-}}
-document.querySelectorAll('.chk-val').forEach(cb=>{{
-  cb.addEventListener('change', function(){{
-    const col=this.dataset.col;
-    const all=document.querySelector('.chk-all[data-col="'+col+'"]');
-    const vals=document.querySelectorAll('.chk-val[data-col="'+col+'"]');
-    if(all) all.checked = Array.from(vals).every(v=>v.checked);
-  }});
-}});
-document.querySelectorAll('.chk-all').forEach(cb=>{{
-  cb.addEventListener('change', function(){{
-    const col=this.dataset.col;
-    const checked=this.checked;
-    document.querySelectorAll('.chk-val[data-col="'+col+'"]').forEach(v=>v.checked=checked);
-  }});
-}});
-document.addEventListener('click', function(e){{
-  if(!e.target.closest('.filter-wrap')){{
-    document.querySelectorAll('.filter-panel').forEach(p=>p.style.display='none');
-  }}
-}});
 function applyFilters(){{
   const q=input.value.toLowerCase();
-  const colSelected={{}};
-  document.querySelectorAll('.filter-panel').forEach(panel=>{{
-    const col=panel.dataset.col;
-    const vals=panel.querySelectorAll('.chk-val');
-    const checked=Array.from(vals).filter(v=>v.checked).map(v=>v.value);
-    if(checked.length>0 && checked.length < vals.length){{
-      colSelected[col]=new Set(checked);
-    }}
+  const filters={{}};
+  document.querySelectorAll('select.colfilter').forEach(s=>{{
+    if(s.value) filters[s.dataset.col]=s.value;
   }});
   document.querySelectorAll('#tbl tbody tr').forEach(tr=>{{
     let show = tr.textContent.toLowerCase().includes(q);
-    for(const col in colSelected){{
-      const val = tr.getAttribute('data-'+col);
-      if(!colSelected[col].has(val)){{ show=false; break; }}
+    for(const col in filters){{
+      if(tr.getAttribute('data-'+col) !== filters[col]){{ show=false; break; }}
     }}
     tr.style.display = show ? '' : 'none';
   }});
+  const visible = Array.from(document.querySelectorAll('#tbl tbody tr')).filter(tr=>tr.style.display!=='none').length;
+  const rc = document.getElementById('rowCount');
+  if(rc) rc.textContent = '(mostrando ' + visible + ' de {len(df)})';
 }}
 input.addEventListener('input', applyFilters);
+document.querySelectorAll('select.colfilter').forEach(s=>s.addEventListener('change', applyFilters));
 function openModal(src){{
   const m=document.getElementById('modal');
   const img=document.getElementById('modalImg');
@@ -290,8 +301,9 @@ document.addEventListener('keydown',function(e){{ if(e.key==='Escape') closeModa
 </body>
 </html>
 """
+
 out = BASE / "galeria.html"
-out.write_text(html, encoding="utf-8")
+out.write_text(html_doc, encoding="utf-8")
 (BASE / "index.html").write_text(
     '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
     '<meta http-equiv="refresh" content="0; url=galeria.html">'
