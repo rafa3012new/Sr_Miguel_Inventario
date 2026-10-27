@@ -32,18 +32,27 @@ def unique_vals(col):
     return vals
 
 
-dropdowns = {}
+filter_panels = {}
 for c in cols:
     if c == "#":
-        dropdowns[c] = '<option value="">Todos</option>'
+        filter_panels[c] = ""
         continue
-    opts = ['<option value="">Todos</option>']
-    if c.startswith("imagen_"):
-        opts += ['<option value="con">Con imagen</option>', '<option value="sin">Sin imagen</option>']
-    else:
-        for v in unique_vals(c):
-            opts.append(f'<option value="{html.escape(v, quote=True)}">{html.escape(v)}</option>')
-    dropdowns[c] = "\n".join(opts)
+    vals = unique_vals(c)
+    cbs = []
+    for v in vals:
+        ev = html.escape(v, quote=True)
+        cbs.append(f'<label class="fp-item"><input type="checkbox" class="chk-val" data-col="{c}" value="{ev}" checked> {html.escape(v)}</label>')
+    panel = (
+        f'<div class="filter-wrap">'
+        f'<button class="filter-btn" data-col="{c}" onclick="toggleFilter(\'{c}\')">&#9660;</button>'
+        f'<div class="filter-panel" id="fp-{c}" data-col="{c}" style="display:none;">'
+        f'<label class="fp-item"><input type="checkbox" class="chk-all" data-col="{c}" checked> (Todos)</label>'
+        f'<div class="fp-list">{"".join(cbs)}</div>'
+        f'<div class="fp-actions"><button onclick="applyFilters()">Aplicar</button>'
+        f'<button onclick="clearFilter(\'{c}\')">Limpiar</button></div>'
+        f'</div></div>'
+    )
+    filter_panels[c] = panel
 
 rows_html = []
 for i, (_, r) in enumerate(df.iterrows(), start=1):
@@ -98,9 +107,7 @@ for c in cols:
     if c == "#":
         header_cells.append(f"<th>#</th>")
     else:
-        header_cells.append(
-            f"<th>{c}<br><select class='colfilter' data-col='{c}'>{dropdowns[c]}</select></th>"
-        )
+        header_cells.append(f"<th>{c}<br>{filter_panels[c]}</th>")
 
 html = f"""<!DOCTYPE html>
 <html lang="es">
@@ -115,8 +122,14 @@ th {{ background: #333; color: #fff; position: sticky; top: 0; }}
 tr.red {{ background: #ffcccc; }}
 img {{ max-width: 120px; max-height: 120px; object-fit: contain; }}
 #search {{ margin-bottom: 10px; padding: 8px; width: 300px; }}
-select.colfilter {{ width: 100%; font-size: 11px; }}
 .thumb {{ cursor: zoom-in; }}
+.filter-wrap {{ position: relative; display: inline-block; }}
+.filter-btn {{ cursor: pointer; border: 1px solid #888; background: #fff; font-size: 11px; padding: 2px 6px; border-radius: 3px; }}
+.filter-panel {{ position: absolute; top: 100%; left: 0; background: #fff; color: #000; border: 1px solid #ccc; padding: 8px; max-height: 280px; overflow: auto; z-index: 100; min-width: 200px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }}
+.fp-item {{ display: block; white-space: nowrap; font-size: 12px; margin: 2px 0; }}
+.fp-list {{ max-height: 190px; overflow: auto; margin: 6px 0; border-top: 1px solid #eee; border-bottom: 1px solid #eee; padding: 4px 0; }}
+.fp-actions {{ display: flex; gap: 6px; margin-top: 6px; }}
+.fp-actions button {{ font-size: 11px; cursor: pointer; }}
 .modal {{ display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }}
 .modal.open {{ display: flex; }}
 .modal img {{ max-width: 90vw; max-height: 75vh; transition: transform .15s ease; transform-origin: center center; }}
@@ -145,22 +158,58 @@ select.colfilter {{ width: 100%; font-size: 11px; }}
 </div>
 <script>
 const input=document.getElementById('search');
+function toggleFilter(col){{
+  document.querySelectorAll('.filter-panel').forEach(p=>{{ if(p.id!=='fp-'+col) p.style.display='none'; }});
+  const p=document.getElementById('fp-'+col);
+  if(p) p.style.display = p.style.display==='none'?'block':'none';
+}}
+function clearFilter(col){{
+  document.querySelectorAll('.chk-val[data-col="'+col+'"]').forEach(v=>v.checked=true);
+  const all=document.querySelector('.chk-all[data-col="'+col+'"]');
+  if(all) all.checked=true;
+  applyFilters();
+}}
+document.querySelectorAll('.chk-val').forEach(cb=>{{
+  cb.addEventListener('change', function(){{
+    const col=this.dataset.col;
+    const all=document.querySelector('.chk-all[data-col="'+col+'"]');
+    const vals=document.querySelectorAll('.chk-val[data-col="'+col+'"]');
+    if(all) all.checked = Array.from(vals).every(v=>v.checked);
+  }});
+}});
+document.querySelectorAll('.chk-all').forEach(cb=>{{
+  cb.addEventListener('change', function(){{
+    const col=this.dataset.col;
+    const checked=this.checked;
+    document.querySelectorAll('.chk-val[data-col="'+col+'"]').forEach(v=>v.checked=checked);
+  }});
+}});
+document.addEventListener('click', function(e){{
+  if(!e.target.closest('.filter-wrap')){{
+    document.querySelectorAll('.filter-panel').forEach(p=>p.style.display='none');
+  }}
+}});
 function applyFilters(){{
   const q=input.value.toLowerCase();
-  const filters={{}};
-  document.querySelectorAll('select.colfilter').forEach(s=>{{
-    if(s.value) filters[s.dataset.col]=s.value;
+  const colSelected={{}};
+  document.querySelectorAll('.filter-panel').forEach(panel=>{{
+    const col=panel.dataset.col;
+    const vals=panel.querySelectorAll('.chk-val');
+    const checked=Array.from(vals).filter(v=>v.checked).map(v=>v.value);
+    if(checked.length>0 && checked.length < vals.length){{
+      colSelected[col]=new Set(checked);
+    }}
   }});
   document.querySelectorAll('#tbl tbody tr').forEach(tr=>{{
     let show = tr.textContent.toLowerCase().includes(q);
-    for(const col in filters){{
-      if(tr.getAttribute('data-'+col) !== filters[col]){{ show=false; break; }}
+    for(const col in colSelected){{
+      const val = tr.getAttribute('data-'+col);
+      if(!colSelected[col].has(val)){{ show=false; break; }}
     }}
     tr.style.display = show ? '' : 'none';
   }});
 }}
 input.addEventListener('input', applyFilters);
-document.querySelectorAll('select.colfilter').forEach(s=>s.addEventListener('change', applyFilters));
 function openModal(src){{
   const m=document.getElementById('modal');
   const img=document.getElementById('modalImg');
@@ -185,4 +234,11 @@ document.addEventListener('keydown',function(e){{ if(e.key==='Escape') closeModa
 """
 out = BASE / "galeria.html"
 out.write_text(html, encoding="utf-8")
+(BASE / "index.html").write_text(
+    '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+    '<meta http-equiv="refresh" content="0; url=galeria.html">'
+    '<title>Galeria de imagenes - Inventario</title></head>'
+    '<body><p>Redirigiendo a la <a href="galeria.html">galeria</a>...</p></body></html>',
+    encoding="utf-8",
+)
 print("Generado:", out)
