@@ -76,8 +76,9 @@ for i, (_, r) in enumerate(df.iterrows(), start=1):
             continue
         val = r.get(c)
         if c.startswith("imagen_") and isinstance(val, str) and val.strip():
-            img = f'<img src="imagenes/{html.escape(str(val), quote=True)}" loading="lazy" alt="{html.escape(str(val))}" onerror="this.style.display=\'none\'">'
-            cells.append(f"<td>{img}<br><small>{val}</small></td>")
+            _v = html.escape(str(val), quote=True)
+            img = f'<img src="imagenes/{_v}" loading="lazy" alt="{html.escape(str(val))}" class="thumb" data-full="imagenes/{_v}" onclick="openModal(this.dataset.full)" onerror="this.style.display=\'none\'">'
+            cells.append(f"<td>{img}<br><small>{html.escape(str(val))}</small></td>")
         else:
             if val is None or (isinstance(val, float) and pd.isna(val)):
                 v = ""
@@ -115,6 +116,13 @@ tr.red {{ background: #ffcccc; }}
 img {{ max-width: 120px; max-height: 120px; object-fit: contain; }}
 #search {{ margin-bottom: 10px; padding: 8px; width: 300px; }}
 select.colfilter {{ width: 100%; font-size: 11px; }}
+.thumb {{ cursor: zoom-in; }}
+.modal {{ display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }}
+.modal.open {{ display: flex; }}
+.modal img {{ max-width: 90vw; max-height: 75vh; transition: transform .15s ease; transform-origin: center center; }}
+.modal-close {{ position: absolute; top: 12px; right: 20px; color: #fff; font-size: 32px; cursor: pointer; line-height: 1; }}
+.modal-controls {{ margin-top: 12px; }}
+.modal-controls button {{ margin: 0 4px; padding: 6px 14px; font-size: 13px; cursor: pointer; }}
 </style>
 </head>
 <body>
@@ -126,6 +134,15 @@ select.colfilter {{ width: 100%; font-size: 11px; }}
 {''.join(rows_html)}
 </tbody>
 </table>
+<div id="modal" class="modal" onclick="if(event.target===this) closeModal()">
+  <span class="modal-close" onclick="closeModal()">&times;</span>
+  <img id="modalImg" src="" alt="">
+  <div class="modal-controls">
+    <button onclick="setZoom(1)">1x</button>
+    <button onclick="setZoom(2)">2x</button>
+    <button onclick="setZoom(3)">3x</button>
+  </div>
+</div>
 <script>
 const input=document.getElementById('search');
 function applyFilters(){{
@@ -144,6 +161,24 @@ function applyFilters(){{
 }}
 input.addEventListener('input', applyFilters);
 document.querySelectorAll('select.colfilter').forEach(s=>s.addEventListener('change', applyFilters));
+function openModal(src){{
+  const m=document.getElementById('modal');
+  const img=document.getElementById('modalImg');
+  img.src=src;
+  img.style.transform='scale(1)';
+  m.classList.add('open');
+}}
+function closeModal(){{
+  const m=document.getElementById('modal');
+  const img=document.getElementById('modalImg');
+  m.classList.remove('open');
+  img.src='';
+  img.style.transform='scale(1)';
+}}
+function setZoom(z){{
+  document.getElementById('modalImg').style.transform='scale('+z+')';
+}}
+document.addEventListener('keydown',function(e){{ if(e.key==='Escape') closeModal(); }});
 </script>
 </body>
 </html>
