@@ -214,6 +214,10 @@ def combined_image(r):
 
 df[IMAGE_COL] = df.apply(combined_image, axis=1)
 
+# Ordenar por OTS_INV ascendente
+df = df.sort_values("OTS_INV", kind="mergesort", na_position="last").reset_index(drop=True)
+
+
 cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", "hoja", IMAGE_COL]
 
 
