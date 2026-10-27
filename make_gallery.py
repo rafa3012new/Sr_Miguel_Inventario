@@ -239,7 +239,7 @@ def unique_vals(col):
             except (ValueError, TypeError):
                 s = str(v).strip()
         elif col == IMAGE_COL:
-            s = "con" if (v is not None and str(v).strip() != "" and not (isinstance(v, float) and pd.isna(v))) else "sin"
+            s = "con" if (v is not None and str(v).strip() != "" and not (isinstance(v, float) and pd.isna(v))) else "sin imagen"
         else:
             s = str(v).strip()
         if s not in seen:
@@ -254,7 +254,7 @@ for c in cols:
         dropdowns[c] = ""
         continue
     if c == IMAGE_COL:
-        vals = ["con", "sin"]
+        vals = ["con imagen", "sin imagen"]
     else:
         vals = unique_vals(c)
     boxes = []
@@ -286,7 +286,7 @@ for i, (_, r) in enumerate(df.iterrows(), start=1):
                 except (ValueError, TypeError):
                     s = str(val).strip()
             elif c == IMAGE_COL:
-                s = "con" if (val is not None and str(val).strip() != "" and not (isinstance(val, float) and pd.isna(val))) else "sin"
+                s = "con imagen" if (val is not None and str(val).strip() != "" and not (isinstance(val, float) and pd.isna(val))) else "sin imagen"
             else:
                 s = str(val).strip()
         data_attrs.append(f'data-{c}="{html.escape(s, quote=True)}"')
