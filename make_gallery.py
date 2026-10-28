@@ -17,6 +17,7 @@ PDF_IMG_SRC = "MMX FALL ATS 6.23 LEVY GROUP 3.pdf"
 PDF_IMG_SRC2 = "LAUNDRY EARLY BUY LINESHEET 3.18.pdf"
 PDF_IMG_DIR = "imagenes_pdf"
 XLS_IMG_DIR = "imagenes_xls"
+ATS_IMG_DIR = "imagenes_ats"
 
 
 def safe_name(s):
@@ -163,6 +164,34 @@ def extract_xls_images():
         mapping.setdefault("V623040H", mapping["V623040"])
     return mapping
 
+
+def extract_ats_images():
+    out_dir = BASE / ATS_IMG_DIR
+    mapping = {}
+    if not out_dir.exists():
+        return mapping
+    # Collect per style, pick the lowest trailing index
+    by_style = {}
+    for f in out_dir.iterdir():
+        if not f.is_file():
+            continue
+        name = f.name
+        if not name.startswith("ATS_") or not name.lower().endswith((".png", ".jpg", ".jpeg")):
+            continue
+        stem = name[4:].rsplit(".", 1)[0]  # style_color_index
+        parts = stem.split("_")
+        if len(parts) < 2:
+            continue
+        style = parts[0]
+        idx = 0
+        if len(parts) >= 3 and parts[-1].isdigit():
+            idx = int(parts[-1])
+        by_style.setdefault(style, []).append((idx, name))
+    for style, cands in by_style.items():
+        cands.sort()
+        mapping[style] = f"{ATS_IMG_DIR}/{cands[0][1]}"
+    return mapping
+
 image_map = extract_excel_images()
 pdf_map = extract_pdf_images()
 # Agregar imagenes del nuevo PDF sin sobrescribir las existentes
@@ -170,6 +199,7 @@ for _k, _v in extract_pdf_images2().items():
     pdf_map.setdefault(_k, _v)
 
 xls_map = extract_xls_images()
+ats_map = extract_ats_images()
 
 df = pd.read_excel(BASE / "Inventario_con_imagenes.xlsx", sheet_name="Data")
 
@@ -207,6 +237,11 @@ def combined_image(r):
     _color = str(r.get("Color_code", "")).strip().upper()
     if (_style, _color) in MANUAL_IMAGE_OVERRIDES:
         return MANUAL_IMAGE_OVERRIDES[(_style, _color)]
+    # Imagen descargada de Rainforest/Amazon para este style
+    if _style == "119004414":
+        return "imagenes/119004414.png"
+    if _style == "117004093":
+        return "imagenes/117004093.jpg"
     excel_fname = image_map.get(
         (str(r.get("TLGDIV_NAME", "")).strip(), str(r.get("Style", "")).strip()), ""
     )
@@ -218,6 +253,9 @@ def combined_image(r):
     xls_fname = xls_map.get(str(r.get("Style", "")).strip(), "")
     if xls_fname:
         return xls_fname
+    ats_fname = ats_map.get(str(r.get("Style", "")).strip(), "")
+    if ats_fname:
+        return ats_fname
     return ""
 
 

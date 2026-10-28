@@ -10,3 +10,6 @@ venv/
 
 # Progreso local (opcional)
 # progress.json
+
+# Variables de entorno / secretos
+.env

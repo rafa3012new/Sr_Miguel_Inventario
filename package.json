@@ -1,0 +1,27 @@
+{
+  "name": "image_generator_api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "gallery": "node make_gallery.js",
+    "gallery:extract": "node make_gallery.js --extract-excel-images"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rafa3012new/Sr_Miguel_Inventario.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/rafa3012new/Sr_Miguel_Inventario/issues"
+  },
+  "homepage": "https://github.com/rafa3012new/Sr_Miguel_Inventario#readme",
+  "dependencies": {
+    "fast-xml-parser": "^5.11.2",
+    "jszip": "^3.10.2",
+    "xlsx": "^0.18.5"
+  }
+}

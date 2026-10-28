@@ -30,6 +30,7 @@ PDF_IMG_SRC = "sources/MMX FALL ATS 6.23 LEVY GROUP 3.pdf"
 PDF_IMG_SRC2 = "sources/LAUNDRY EARLY BUY LINESHEET 3.18.pdf"
 PDF_IMG_DIR = "imagenes_pdf"
 XLS_IMG_DIR = "imagenes_xls"
+ATS_IMG_DIR = "imagenes_ats"
 
 REQUIRED_COLS = ["TLGDIV_NAME", "Style", "Style_Name", "Color_code"]
 
@@ -198,16 +199,58 @@ def extract_xls_images():
     return mapping
 
 
+def extract_ats_images():
+    out_dir = BASE_DIR / ATS_IMG_DIR
+    mapping = {}
+    if not out_dir.exists():
+        return mapping
+    by_style = {}
+    for f in out_dir.iterdir():
+        if not f.is_file():
+            continue
+        name = f.name
+        if not name.startswith("ATS_") or not name.lower().endswith((".png", ".jpg", ".jpeg")):
+            continue
+        stem = name[4:].rsplit(".", 1)[0]
+        parts = stem.split("_")
+        if len(parts) < 2:
+            continue
+        style = parts[0]
+        idx = 0
+        if len(parts) >= 3 and parts[-1].isdigit():
+            idx = int(parts[-1])
+        by_style.setdefault(style, []).append((idx, name))
+    for style, cands in by_style.items():
+        cands.sort()
+        mapping[style] = f"{ATS_IMG_DIR}/{cands[0][1]}"
+    return mapping
+
+
 MANUAL_IMAGE_OVERRIDES = {
     ("V322453M", "STO"): "V322453M_COLOR_STONE.png",
 }
 
 
-def combined_image(r, image_map, pdf_map, xls_map):
+def combined_image(r, image_map, pdf_map, xls_map, ats_map=None):
     _style = str(r.get("Style", "")).strip()
     _color = str(r.get("Color_code", "")).strip().upper()
     if (_style, _color) in MANUAL_IMAGE_OVERRIDES:
         return MANUAL_IMAGE_OVERRIDES[(_style, _color)]
+    # Imagen descargada de Rainforest/Amazon para este style
+    if _style == "119004414":
+        return "imagenes/119004414.png"
+    if _style == "119000214":
+        return "imagenes/119000214.jpg"
+    if _style == "119000455":
+        return "imagenes/119000455.jpg"
+    if _style == "119001566":
+        return "imagenes/119001566.jpg"
+    if _style == "119001328":
+        return "imagenes/119001328.jpg"
+    if _style == "119005385":
+        return "imagenes/119005385.jpg"
+    if _style == "121000428":
+        return "imagenes/121000428.jpg"
     excel_fname = image_map.get(
         (str(r.get("TLGDIV_NAME", "")).strip(), _style), ""
     )
@@ -219,6 +262,10 @@ def combined_image(r, image_map, pdf_map, xls_map):
     xls_fname = xls_map.get(_style, "")
     if xls_fname:
         return xls_fname
+    if ats_map:
+        ats_fname = ats_map.get(_style, "")
+        if ats_fname:
+            return ats_fname
     return ""
 
 
@@ -248,8 +295,9 @@ def main():
     for _k, _v in extract_pdf_images2().items():
         pdf_map.setdefault(_k, _v)
     xls_map = extract_xls_images()
+    ats_map = extract_ats_images()
 
-    df[IMAGE_COL] = df.apply(lambda r: combined_image(r, image_map, pdf_map, xls_map), axis=1)
+    df[IMAGE_COL] = df.apply(lambda r: combined_image(r, image_map, pdf_map, xls_map, ats_map), axis=1)
 
     out_df = df.copy()
 
