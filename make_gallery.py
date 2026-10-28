@@ -201,11 +201,30 @@ for _k, _v in extract_pdf_images2().items():
 xls_map = extract_xls_images()
 ats_map = extract_ats_images()
 
+
+def extract_imagenes():
+    out_dir = BASE / "imagenes"
+    mapping = {}
+    if not out_dir.exists():
+        return mapping
+    for f in out_dir.iterdir():
+        if not f.is_file():
+            continue
+        if f.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+            continue
+        stem = f.stem
+        if stem not in mapping:
+            mapping[stem] = f"imagenes/{f.name}"
+    return mapping
+
+
+imagenes_map = extract_imagenes()
+
 df = pd.read_excel(BASE / "Inventario_con_imagenes.xlsx", sheet_name="Data")
 
 # Columna "Color_Name" mapeada desde Inventario-1.xlsx por Style + Color_code
 try:
-    _inv1 = pd.read_excel(BASE / "Inventario-1.xlsx", sheet_name="Data")
+    _inv1 = pd.read_excel(BASE / "sources" / "Inventario-1.xlsx", sheet_name="Data")
     _cn = {}
     for _, _r in _inv1.iterrows():
         _k = (str(_r.get("Style", "")).strip(), str(_r.get("Color_code", "")).strip().upper())
@@ -251,8 +270,21 @@ def combined_image(r):
     ats_fname = ats_map.get(str(r.get("Style", "")).strip(), "")
     if ats_fname:
         return ats_fname
+    # Imagenes de la carpeta \imagenes, solo si no hay otra ya mapeada.
+    img_fname = imagenes_map.get(str(r.get("Style", "")).strip())
+    if img_fname:
+        return img_fname
     return ""
 
+
+# Eliminar filas en blanco / totales / (en blanco)
+def _is_excluded_row(r):
+    excluded = {"", "(blank)", "nan", "(en blanco)", "total general"}
+    tl = str(r.get("TLGDIV_NAME", "")).strip().lower()
+    st = str(r.get("Style", "")).strip().lower()
+    return tl in excluded or st in excluded
+
+df = df[~df.apply(_is_excluded_row, axis=1)].reset_index(drop=True)
 
 df[IMAGE_COL] = df.apply(combined_image, axis=1)
 
@@ -281,7 +313,7 @@ def unique_vals(col):
             except (ValueError, TypeError):
                 s = str(v).strip()
         elif col == IMAGE_COL:
-            s = "con" if (v is not None and str(v).strip() != "" and not (isinstance(v, float) and pd.isna(v))) else "sin imagen"
+            s = "con imagen" if (v is not None and str(v).strip() != "" and not (isinstance(v, float) and pd.isna(v))) else "sin imagen"
         else:
             s = str(v).strip()
         if s not in seen:
@@ -361,7 +393,7 @@ for c in cols:
         header_cells.append(f"<th data-col='#'>#<div class='col-resizer' data-col='#'></div></th>")
     else:
         header_cells.append(
-            f"<th data-col='{c}'>{c} <span class='sortbtn' data-col='{c}' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='{c}'>Filtrar</button><div class='filterpanel' data-col='{c}' style='display:none'>{dropdowns[c]}</div><div class='col-resizer' data-col='{c}'></div></th>"
+            f"<th data-col='{c}'>{c} <span class='sortbtn' data-col='{c}' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><div style='height:10px; line-height:10px;'>&nbsp;</div><button class='filterbtn' data-col='{c}'>Filtrar</button><div class='filterpanel' data-col='{c}' style='display:none'>{dropdowns[c]}</div><div class='col-resizer' data-col='{c}'></div></th>"
         )
 
 html_doc = f"""<!DOCTYPE html>
@@ -375,9 +407,10 @@ table {{ border-collapse: collapse; width: 100%; table-layout: fixed; }}
 th, td {{ border: 1px solid #ccc; padding: 6px; vertical-align: top; font-size: 12px; }}
 th {{ background: #333; color: #fff; position: sticky; top: 0; }}
 tr.red {{ background: #ffcccc; }}
+th.filtered {{ background: #00bcd4 !important; color: #000 !important; }}
 .col-resizer {{ position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 6; background: transparent; }}
 .col-resizer:hover {{ background: rgba(255,255,255,0.35); }}
-th[data-col="#"], td[data-col="#"] {{ width: 40px; min-width: 40px; }}
+th[data-col="#"], td[data-col="#"] {{ width: 30px; min-width: 30px; }}
 th[data-col="Color_code"], td[data-col="Color_code"] {{ width: 80px; min-width: 80px; }}
 th[data-col="Size_Desc"], td[data-col="Size_Desc"] {{ width: 70px; min-width: 70px; }}
 th[data-col="OTS_INV"], td[data-col="OTS_INV"] {{ width: 55px; min-width: 55px; }}
@@ -411,7 +444,7 @@ select.colfilter {{ width: 100%; font-size: 11px; }}
 <table id="tbl">
 <thead><tr>{''.join(header_cells)}</tr></thead>
 <tbody>
-{''.join(rows_html)}
+{'\n'.join(rows_html)}
 </tbody>
 </table>
 <div id="modal" class="modal" onclick="if(event.target===this) closeModal()">
@@ -424,8 +457,20 @@ select.colfilter {{ width: 100%; font-size: 11px; }}
   </div>
 </div>
 <script>
-const COLS = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", "hoja", "Imagen"];
+const COLS = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", "Imagen"];
 const input=document.getElementById('search');
+function rowPassesFilters(tr, filtersToUse, q){{
+  if(!tr.textContent.toLowerCase().includes(q)) return false;
+  for(const col in filtersToUse){{
+    const val = tr.getAttribute('data-'+col);
+    const f = filtersToUse[col];
+    if (f instanceof Set) {{
+      if (f.size === 0 || !f.has(val)) return false;
+    }} else if (f && val !== f) return false;
+  }}
+  return true;
+}}
+
 function applyFilters(){{
   const q=input.value.toLowerCase();
   const filters={{}};
@@ -446,6 +491,33 @@ function applyFilters(){{
       }}
     }}
   }});
+
+  // Filtro cruzado (faceted)
+  const allRows = Array.from(document.querySelectorAll('#tbl tbody tr'));
+  document.querySelectorAll('.filterpanel').forEach(panel=>{{
+    const targetCol = panel.dataset.col;
+    const otherFilters = {{}};
+    for(const c in filters){{
+      if (c !== targetCol) otherFilters[c] = filters[c];
+    }}
+    const available = new Set();
+    allRows.forEach(tr=>{{
+      if (rowPassesFilters(tr, otherFilters, q)) {{
+        available.add(tr.getAttribute('data-'+targetCol));
+      }}
+    }});
+    panel.querySelectorAll('.colchk').forEach(cb=>{{
+      if (cb.value === '__ALL__') return;
+      const isAvailable = available.has(cb.value);
+      cb.disabled = !isAvailable;
+      const lbl = cb.parentElement;
+      if (lbl) {{
+        lbl.style.opacity = isAvailable ? '1' : '0.45';
+        lbl.style.pointerEvents = isAvailable ? '' : 'none';
+      }}
+    }});
+  }});
+
   // resaltar columnas filtradas en cyan
   document.querySelectorAll('th').forEach(th=>{{
     const btn = th.querySelector('.filterbtn');
@@ -505,6 +577,8 @@ try {{
 }} catch(err) {{}}
 
 input.addEventListener('input', applyFilters);
+// inicializar disponibilidad cruzada al cargar
+applyFilters();
 
 let sortState = {{ col: null, asc: true }};
 function sortTable(btn){{
@@ -609,13 +683,6 @@ if(_modalEl){{
 </body>
 </html>
 """
-out = BASE / "galeria.html"
+out = BASE / "index.html"
 out.write_text(html_doc, encoding="utf-8")
-(BASE / "index.html").write_text(
-    '<' + '!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
-    '<meta http-equiv="refresh" content="0; url=galeria.html">'
-    '<title>Galeria de imagenes - Inventario</title></head>'
-    '<body><p>Redirigiendo a la <a href="galeria.html">galeria</a>...</p></body></html>',
-    encoding="utf-8",
-)
 print("Generado:", out)

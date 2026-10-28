@@ -824,11 +824,8 @@ if(_modalEl){
 </body>
 </html>`;
 
-  const out = path.join(BASE, "galeria.html");
+  const out = path.join(BASE, "index.html");
   fs.writeFileSync(out, htmlDoc, "utf8");
-  fs.writeFileSync(path.join(BASE, "index.html"),
-    '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=galeria.html"><title>Galeria de imagenes - Inventario</title></head><body><p>Redirigiendo a la <a href="galeria.html">galeria</a>...</p></body></html>',
-    "utf8");
   console.log("Generado:", out);
 }
 

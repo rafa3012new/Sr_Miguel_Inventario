@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Actualizar Galeria - File System Access API</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding: 2rem; background: #f8f9fa; }
+    .preview-img { max-height: 160px; object-fit: contain; }
+    .status { min-height: 1.5rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h1 class="h4 mb-0">Actualizar galeria de imagenes (local)</h1>
+      </div>
+      <div class="card-body">
+        <p class="text-muted">
+          Selecciona la carpeta del proyecto. El modulo escaneara las imagenes por numero de estilo
+          y sobrescribira <code>index.html</code> con una galeria Bootstrap actualizada.
+        </p>
+        <div class="d-flex gap-2 mb-3">
+          <button id="btnSelect" class="btn btn-primary">Seleccionar carpeta</button>
+          <button id="btnWrite" class="btn btn-success" disabled>Sobrescribir index.html</button>
+        </div>
+        <div id="status" class="status text-secondary"></div>
+        <div id="preview" class="row g-3 mt-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const btnSelect = document.getElementById('btnSelect');
+    const btnWrite = document.getElementById('btnWrite');
+    const statusEl = document.getElementById('status');
+    const previewEl = document.getElementById('preview');
+
+    let dirHandle = null;
+    let imageMap = []; // { style, relPath } combined (existing + new)
+    let existingStyles = new Set();
+    let missingStyles = new Set();
+    let allStyles = new Set();
+
+    const imageExt = /\.(png|jpe?g|gif|webp)$/i;
+
+    function escapeRegex(s) {
+      return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // Extract a gallery style number from an image file name.
+    // Handles prefixes (excel_, pdf_, xls_, ATS_) and suffixes (color codes).
+    function styleFromFilename(name, styleSet) {
+      const stem = String(name).replace(/\.[^.]+$/, '');
+      let candidate = stem;
+      if (/^excel_/i.test(stem)) {
+        const parts = stem.split('_');
+        candidate = parts[parts.length - 1];
+      } else if (/^pdf_/i.test(stem)) {
+        candidate = stem.slice(4);
+      } else if (/^xls_/i.test(stem)) {
+        candidate = stem.slice(4);
+      } else if (/^ATS_/i.test(stem)) {
+        const parts = stem.slice(4).split('_');
+        candidate = parts[0];
+      }
+      const set = styleSet || new Set();
+      if (candidate && set.has(candidate)) return candidate;
+      // Try to find a known style contained in the (full) stem.
+      let best = null;
+      for (const s of set) {
+        if (stem.includes(s) && (!best || s.length > best.length)) best = s;
+      }
+      if (best) return best;
+      // Fallback: strip suffix after first underscore.
+      const first = stem.split('_')[0];
+      if (!set.size || set.has(first)) return first;
+      return stem;
+    }
+
+    async function readExistingImages() {
+      const existing = new Map();
+      existingStyles = new Set();
+      missingStyles = new Set();
+      allStyles = new Set();
+      try {
+        const fh = await dirHandle.getFileHandle('index.html');
+        const file = await fh.getFile();
+        const text = await file.text();
+        const trRegex = /<tr\b[^>]*data-Style="([^"]+)"[^>]*>([\s\S]*?)<\/tr>/g;
+        let m;
+        while ((m = trRegex.exec(text)) !== null) {
+          const style = m[1];
+          allStyles.add(style);
+          const rowHtml = m[2];
+          const fullRow = m[0];
+          const imgMatch = rowHtml.match(/<img[^>]*src="([^"]+)"/);
+          if (imgMatch) {
+            if (!existing.has(style)) existing.set(style, imgMatch[1]);
+          } else {
+            const imMatch = fullRow.match(/data-Imagen="([^"]*)"/);
+            const imVal = imMatch ? imMatch[1] : '';
+            if (imVal !== 'con imagen') missingStyles.add(style);
+          }
+        }
+      } catch (e) {
+        // Fallback to previous extraction method.
+        try {
+          const fh = await dirHandle.getFileHandle('index.html');
+          const file = await fh.getFile();
+          const text = await file.text();
+          function extractStyleFromPath(p) {
+            const name = p.split('/').pop();
+            const mm = name.match(/(\d{7,})/);
+            return mm ? mm[1] : name.replace(/\.[^.]+$/, '');
+          }
+          const re = /<img[^>]*src="([^"]+)"[^>]*alt="([^"]*)"/g;
+          let mm;
+          while ((mm = re.exec(text)) !== null) {
+            const p = mm[1];
+            const style = extractStyleFromPath(p);
+            if (!existing.has(style)) existing.set(style, p);
+          }
+          const re2 = /src="(imagenes[^"]+)"/g;
+          while ((mm = re2.exec(text)) !== null) {
+            const p = mm[1];
+            const style = extractStyleFromPath(p);
+            if (!existing.has(style)) existing.set(style, p);
+          }
+        } catch (e2) {}
+      }
+      // Any style present in gallery but not in existing is considered missing.
+      for (const s of allStyles) {
+        if (!existing.has(s)) missingStyles.add(s);
+      }
+      existingStyles = new Set(existing.keys());
+      return existing;
+    }
+
+    function setStatus(msg, type = 'secondary') {
+      statusEl.className = 'status text-' + type;
+      statusEl.textContent = msg;
+    }
+
+    const SKIP_DIRS = new Set(['node_modules', '.git', '__pycache__', '.venv', 'dist', 'build']);
+    async function scanDirectory(handle, basePath = '') {
+      const results = [];
+      for await (const entry of handle.values()) {
+        if (entry.kind === 'directory' && SKIP_DIRS.has(entry.name)) continue;
+        if (entry.kind === 'directory' && entry.name.startsWith('.')) continue;
+        const rel = basePath ? basePath + '/' + entry.name : entry.name;
+        if (entry.kind === 'file' && imageExt.test(entry.name)) {
+          results.push({ name: entry.name, relPath: rel });
+        } else if (entry.kind === 'directory') {
+          const sub = await scanDirectory(entry, rel);
+          results.push(...sub);
+        }
+      }
+      return results;
+    }
+
+    function renderPreview() {
+      previewEl.innerHTML = '';
+      imageMap.forEach(item => {
+        const col = document.createElement('div');
+        col.className = 'col-6 col-md-3 col-lg-2';
+        const isNew = missingStyles.has(item.style) || !existingStyles.has(item.style);
+        col.innerHTML = `
+          <div class="card h-100 ${isNew ? 'border-danger' : ''}">
+            <img src="${item.relPath}" class="card-img-top preview-img" alt="${item.style}" onerror="this.style.display='none'">
+            <div class="card-body p-2 text-center">
+              <small class="fw-bold ${isNew ? 'text-danger' : ''}">${item.style}${isNew ? ' (nuevo)' : ''}</small>
+            </div>
+          </div>`;
+        previewEl.appendChild(col);
+      });
+    }
+
+    // Update the existing complex gallery HTML in-place: add images only for new styles.
+    // Single pass over the document (O(n)) instead of one regex pass per style,
+    // which froze the tab on large files with hundreds of styles.
+    function updateGalleryHtml(originalText, newImages) {
+      const pathByStyle = new Map(newImages.map(item => [item.style, item.relPath]));
+      const stylesToUpdate = new Set(pathByStyle.keys());
+      const rowRegex = /<tr\b[^>]*data-Style="([^"]+)"[^>]*>[\s\S]*?<\/tr>/g;
+      return originalText.replace(rowRegex, function (row, style) {
+        if (!stylesToUpdate.has(style)) return row;
+        const path = pathByStyle.get(style);
+        const imgTag = '<img src="' + path + '" loading="lazy" alt="' + path + '" class="thumb" data-full="' + path + '" onclick="openModal(this.dataset.full)" onerror="this.style.display=\'none\'">';
+        row = row.replace(/data-Imagen="sin imagen"/g, 'data-Imagen="con imagen"');
+        row = row.replace(/<td data-col=(["'])Imagen\1><\/td>/g, '<td data-col="Imagen">' + imgTag + '</td>');
+        return row;
+      });
+    }
+
+    btnSelect.addEventListener('click', async () => {
+      try {
+        if (!window.showDirectoryPicker) {
+          setStatus('Tu navegador no soporta File System Access API. Usa Chrome/Edge.', 'danger');
+          return;
+        }
+        dirHandle = await window.showDirectoryPicker();
+        setStatus('Escaneando carpeta...', 'info');
+        console.log('Selected dir:', dirHandle ? dirHandle.name : '(none)');
+
+        const existing = await readExistingImages();
+        if (allStyles.size === 0) {
+          setStatus('No se encontro index.html valido en la carpeta seleccionada. Selecciona la carpeta raiz del proyecto (la que contiene index.html).', 'danger');
+          btnWrite.disabled = true;
+          return;
+        }
+        const rawFound = await scanDirectory(dirHandle);
+
+        // Normalize scanned files to gallery style numbers and keep only those
+        // that correspond to gallery rows without an image (or unknown/new).
+        const found = [];
+        for (const item of rawFound) {
+          const style = styleFromFilename(item.name, allStyles.size ? allStyles : new Set());
+          if (!style) continue;
+          if (existingStyles.has(style)) continue; // already has image
+          if (allStyles.size > 0 && !allStyles.has(style)) continue; // only gallery styles
+          found.push({ style, relPath: item.relPath });
+        }
+
+        // Combine: keep existing, add only new (skip duplicates by style)
+        const combined = new Map(existing);
+        let added = 0;
+        for (const item of found) {
+          if (!combined.has(item.style)) {
+            combined.set(item.style, item.relPath);
+            added++;
+          }
+        }
+        imageMap = Array.from(combined, ([style, relPath]) => ({ style, relPath }));
+
+        renderPreview();
+        btnWrite.disabled = imageMap.length === 0 || found.length === 0;
+        setStatus(`Existentes: ${existing.size}. Nuevas agregadas: ${added}. Sin imagen en galeria: ${missingStyles.size}. Total: ${imageMap.length}. Listo para sobrescribir.`, 'success');
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error(err);
+          setStatus('Error al seleccionar carpeta: ' + err.message, 'danger');
+        }
+      }
+    });
+
+    btnWrite.addEventListener('click', async () => {
+      if (!dirHandle || imageMap.length === 0) return;
+      try {
+        const fileHandle = await dirHandle.getFileHandle('index.html', { create: true });
+        // Request write permission
+        if (await fileHandle.queryPermission({ mode: 'readwrite' }) !== 'granted') {
+          const perm = await fileHandle.requestPermission({ mode: 'readwrite' });
+          if (perm !== 'granted') {
+            setStatus('Permiso de escritura denegado.', 'danger');
+            return;
+          }
+        }
+        const file = await fileHandle.getFile();
+        const originalText = await file.text();
+        // Only update with new images (skip existing)
+        const newImages = imageMap.filter(item => !existingStyles.has(item.style));
+        if (newImages.length === 0) {
+          setStatus('No hay imagenes nuevas para agregar.', 'info');
+          return;
+        }
+        const updatedText = updateGalleryHtml(originalText, newImages);
+        const writable = await fileHandle.createWritable({ keepExistingData: false });
+        await writable.write(updatedText);
+        await writable.close();
+        // Verify the write actually landed.
+        const verifyHandle = await dirHandle.getFileHandle('index.html');
+        const verifyFile = await verifyHandle.getFile();
+        const verifyText = await verifyFile.text();
+        const ok = (verifyText === updatedText);
+        if (ok) {
+          newImages.forEach(item => existingStyles.add(item.style));
+          btnWrite.disabled = true;
+          setStatus('index.html actualizado con ' + newImages.length + ' imagen(es) nueva(s). Recarga la pagina (Ctrl+F5).', 'success');
+        } else {
+          setStatus('La escritura no se reflejo. verifyLen=' + verifyText.length + ' expected=' + updatedText.length, 'danger');
+          console.error('verify mismatch', { lenOrig: originalText.length, lenNew: updatedText.length, lenVerify: verifyText.length, equal: ok });
+        }
+      } catch (err) {
+        console.error(err);
+        setStatus('Error al escribir: ' + err.message, 'danger');
+      }
+    });
+  </script>
+</body>
+</html>
