@@ -197,7 +197,16 @@ except Exception:
 
 
 
+# Mapeos manuales de imagenes por estilo + color (sobrescriben el resto)
+MANUAL_IMAGE_OVERRIDES = {
+    ("V322453M", "STO"): "V322453M_COLOR_STONE.png",
+}
+
 def combined_image(r):
+    _style = str(r.get("Style", "")).strip()
+    _color = str(r.get("Color_code", "")).strip().upper()
+    if (_style, _color) in MANUAL_IMAGE_OVERRIDES:
+        return MANUAL_IMAGE_OVERRIDES[(_style, _color)]
     excel_fname = image_map.get(
         (str(r.get("TLGDIV_NAME", "")).strip(), str(r.get("Style", "")).strip()), ""
     )
