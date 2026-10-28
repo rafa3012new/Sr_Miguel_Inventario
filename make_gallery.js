@@ -118,6 +118,20 @@ function scanAtsImages() {
   return map;
 }
 
+function scanImagenes() {
+  const map = {};
+  const dir = path.join(BASE, "imagenes");
+  if (!fs.existsSync(dir)) return map;
+  for (const f of fs.readdirSync(dir)) {
+    const full = path.join(dir, f);
+    if (!fs.statSync(full).isFile()) continue;
+    if (!/\.(png|jpg|jpeg)$/i.test(f)) continue;
+    const stem = f.replace(/\.[^.]+$/, "");
+    if (!map[stem]) map[stem] = `imagenes/${f}`;
+  }
+  return map;
+}
+
 async function extractExcelImagesEmbedded() {
   const JSZip = require("jszip");
   const { XMLParser } = require("fast-xml-parser");
@@ -225,7 +239,7 @@ async function extractExcelImagesEmbedded() {
   return map;
 }
 
-function combinedImage(r, imageMap, pdfMap, xlsMap, atsMap) {
+function combinedImage(r, imageMap, pdfMap, xlsMap, atsMap, imagenesMap) {
   const style = String(r.Style ?? "").trim();
   const color = String(r.Color_code ?? "").trim().toUpperCase();
   // manual overrides
@@ -252,6 +266,10 @@ function combinedImage(r, imageMap, pdfMap, xlsMap, atsMap) {
 
   const atsFname = atsMap[style];
   if (atsFname) return atsFname;
+
+  // Imagenes de la carpeta \imagenes, solo si no hay otra ya mapeada.
+  const imgFname = imagenesMap ? imagenesMap[style] : null;
+  if (imgFname) return imgFname;
 
   return "";
 }
@@ -341,6 +359,7 @@ const dataRows = rawRows.slice(1).filter((r) => r.some((v) => String(v ?? "").tr
   const scannedPdf = scanPdfImages();
   const scannedXls = scanXlsImages();
   const scannedAts = scanAtsImages();
+  const scannedImagenes = scanImagenes();
 
   if (Object.keys(excelMap).length === 0) excelMap = scannedExcel;
   else for (const k of Object.keys(scannedExcel)) if (!(k in excelMap)) excelMap[k] = scannedExcel[k];
@@ -371,7 +390,7 @@ const dataRows = rawRows.slice(1).filter((r) => r.some((v) => String(v ?? "").tr
 
   // combined image
   for (const r of df) {
-    r[IMAGE_COL] = combinedImage(r, excelMap, pdfMap, xlsMap, atsMap);
+    r[IMAGE_COL] = combinedImage(r, excelMap, pdfMap, xlsMap, atsMap, scannedImagenes);
   }
 
   // sort by OTS_INV asc
@@ -525,7 +544,7 @@ th { background: #333; color: #fff; position: sticky; top: 0; }
 tr.red { background: #ffcccc; }
 .col-resizer { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 6; background: transparent; }
 .col-resizer:hover { background: rgba(255,255,255,0.35); }
-th[data-col="#"], td[data-col="#"] { width: 40px; min-width: 40px; }
+th[data-col="#"], td[data-col="#"] { width: 30px; min-width: 30px; }
 th[data-col="Color_code"], td[data-col="Color_code"] { width: 80px; min-width: 80px; }
 th[data-col="Size_Desc"], td[data-col="Size_Desc"] { width: 70px; min-width: 70px; }
 th[data-col="OTS_INV"], td[data-col="OTS_INV"] { width: 55px; min-width: 55px; }
