@@ -203,11 +203,6 @@ ats_map = extract_ats_images()
 
 df = pd.read_excel(BASE / "Inventario_con_imagenes.xlsx", sheet_name="Data")
 
-# Columna 'hoja': registros originales (Inventario) = sheet2, nuevos (append de Inventario-1) = sheet1
-ORIGINAL_ROWS = 4924
-df["hoja"] = (["sheet2"] * min(ORIGINAL_ROWS, len(df))
-              + ["sheet1"] * max(0, len(df) - ORIGINAL_ROWS))
-
 # Columna "Color_Name" mapeada desde Inventario-1.xlsx por Style + Color_code
 try:
     _inv1 = pd.read_excel(BASE / "Inventario-1.xlsx", sheet_name="Data")
@@ -265,7 +260,7 @@ df[IMAGE_COL] = df.apply(combined_image, axis=1)
 df = df.sort_values("OTS_INV", kind="mergesort", na_position="last").reset_index(drop=True)
 
 
-cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", "hoja", IMAGE_COL]
+cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", IMAGE_COL]
 
 
 def is_red(row):
@@ -345,7 +340,7 @@ for i, (_, r) in enumerate(df.iterrows(), start=1):
         if c == IMAGE_COL and isinstance(val, str) and val.strip():
             _v = html.escape(str(val), quote=True)
             img = f'<img src="{_v}" loading="lazy" alt="{html.escape(str(val))}" class="thumb" data-full="{_v}" onclick="openModal(this.dataset.full)" onerror="this.style.display=\'none\'">'
-            cells.append(f"<td>{img}<br><small>{html.escape(str(val))}</small></td>")
+            cells.append(f"<td data-col=\"{c}\">{img}</td>")
         else:
             if val is None or (isinstance(val, float) and pd.isna(val)):
                 v = ""
@@ -357,16 +352,16 @@ for i, (_, r) in enumerate(df.iterrows(), start=1):
                     v = str(val)
             else:
                 v = str(val)
-            cells.append(f"<td>{html.escape(str(v))}</td>")
+            cells.append(f"<td data-col=\"{c}\">{html.escape(str(v))}</td>")
     rows_html.append(f"<tr{tr_class} {' '.join(data_attrs)}>{''.join(cells)}</tr>")
 
 header_cells = []
 for c in cols:
     if c == "#":
-        header_cells.append(f"<th>#</th>")
+        header_cells.append(f"<th data-col='#'>#<div class='col-resizer' data-col='#'></div></th>")
     else:
         header_cells.append(
-            f"<th>{c} <span class='sortbtn' data-col='{c}' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='{c}'>Filtrar</button><div class='filterpanel' data-col='{c}' style='display:none'>{dropdowns[c]}</div></th>"
+            f"<th data-col='{c}'>{c} <span class='sortbtn' data-col='{c}' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><button class='filterbtn' data-col='{c}'>Filtrar</button><div class='filterpanel' data-col='{c}' style='display:none'>{dropdowns[c]}</div><div class='col-resizer' data-col='{c}'></div></th>"
         )
 
 html_doc = f"""<!DOCTYPE html>
@@ -376,10 +371,21 @@ html_doc = f"""<!DOCTYPE html>
 <title>Galeria de imagenes - Inventario</title>
 <style>
 body {{ font-family: Arial, sans-serif; margin: 20px; }}
-table {{ border-collapse: collapse; width: 100%; }}
+table {{ border-collapse: collapse; width: 100%; table-layout: fixed; }}
 th, td {{ border: 1px solid #ccc; padding: 6px; vertical-align: top; font-size: 12px; }}
 th {{ background: #333; color: #fff; position: sticky; top: 0; }}
 tr.red {{ background: #ffcccc; }}
+.col-resizer {{ position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 6; background: transparent; }}
+.col-resizer:hover {{ background: rgba(255,255,255,0.35); }}
+th[data-col="#"], td[data-col="#"] {{ width: 40px; min-width: 40px; }}
+th[data-col="Color_code"], td[data-col="Color_code"] {{ width: 80px; min-width: 80px; }}
+th[data-col="Size_Desc"], td[data-col="Size_Desc"] {{ width: 70px; min-width: 70px; }}
+th[data-col="OTS_INV"], td[data-col="OTS_INV"] {{ width: 55px; min-width: 55px; }}
+th[data-col="TLGDIV_NAME"], td[data-col="TLGDIV_NAME"] {{ width: 90px; min-width: 90px; }}
+th[data-col="Style"], td[data-col="Style"] {{ width: 70px; min-width: 70px; }}
+th[data-col="Style_Name"], td[data-col="Style_Name"] {{ width: 176px; min-width: 176px; }}
+th[data-col="Color_Name"], td[data-col="Color_Name"] {{ width: 80px; min-width: 80px; }}
+th[data-col="Imagen"], td[data-col="Imagen"] {{ width: 130px; max-width: 130px; }}
 img {{ max-width: 120px; max-height: 120px; object-fit: contain; }}
 .sortbtn {{ cursor: pointer; font-size: 12px; color: #fff; user-select: none; }}
 th {{ position: relative; }}
@@ -401,6 +407,7 @@ select.colfilter {{ width: 100%; font-size: 11px; }}
 <body>
 <h2>Galeria de imagenes - Inventario ({len(df)} filas) <span id="rowCount" style="font-size:13px; font-weight:normal;">(mostrando {len(df)})</span></h2>
 <input type="text" id="search" placeholder="Buscar texto en toda la fila...">
+<button id="resetFilters" style="margin-left:10px; padding:8px 12px; cursor:pointer;">Reset filters</button>
 <table id="tbl">
 <thead><tr>{''.join(header_cells)}</tr></thead>
 <tbody>
@@ -460,6 +467,43 @@ function applyFilters(){{
   const rc = document.getElementById('rowCount');
   if(rc) rc.textContent = '(mostrando ' + visible + ' de {len(df)})';
 }}
+
+// === Resize de columnas con el mouse ===
+let _resizing = null;
+document.addEventListener('mousedown', function(e){{
+  const handle = (e.target && e.target.classList && e.target.classList.contains('col-resizer')) ? e.target : null;
+  if (!handle) return;
+  const th = handle.parentElement;
+  _resizing = {{ th: th, startX: e.clientX, startWidth: th.getBoundingClientRect().width }};
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  e.preventDefault();
+  e.stopPropagation();
+}});
+document.addEventListener('mousemove', function(e){{
+  if (!_resizing) return;
+  const delta = e.clientX - _resizing.startX;
+  const newWidth = Math.max(60, _resizing.startWidth + delta);
+  _resizing.th.style.width = newWidth + 'px';
+  _resizing.th.style.minWidth = newWidth + 'px';
+}});
+document.addEventListener('mouseup', function(){{
+  if (!_resizing) return;
+  const widths = {{}};
+  document.querySelectorAll('th[data-col]').forEach(function(th){{ widths[th.dataset.col] = th.getBoundingClientRect().width; }});
+  try {{ localStorage.setItem('colWidths', JSON.stringify(widths)); }} catch(err) {{}}
+  _resizing = null;
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+}});
+try {{
+  const saved = JSON.parse(localStorage.getItem('colWidths') || '{{}}');
+  Object.keys(saved).forEach(function(col){{
+    const th = document.querySelector('th[data-col="'+col+'"]');
+    if (th) {{ th.style.width = saved[col] + 'px'; th.style.minWidth = saved[col] + 'px'; }}
+  }});
+}} catch(err) {{}}
+
 input.addEventListener('input', applyFilters);
 
 let sortState = {{ col: null, asc: true }};

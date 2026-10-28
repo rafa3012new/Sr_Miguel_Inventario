@@ -331,7 +331,19 @@ def main():
                 cell.value = val
 
     for c in range(1, ws.max_column + 1):
-        ws.column_dimensions[get_column_letter(c)].width = 22
+        _cname = header[c - 1] if c - 1 < len(header) else ""
+        if _cname == "Style_Name":
+            ws.column_dimensions[get_column_letter(c)].width = 34
+        elif _cname == "Color_Name":
+            ws.column_dimensions[get_column_letter(c)].width = 21
+        elif _cname == "TLGDIV_NAME":
+            ws.column_dimensions[get_column_letter(c)].width = 21
+        elif _cname == "Style":
+            ws.column_dimensions[get_column_letter(c)].width = 21
+        elif _cname == "Imagen":
+            ws.column_dimensions[get_column_letter(c)].width = 24
+        else:
+            ws.column_dimensions[get_column_letter(c)].width = 22
 
     wb.save(EXCEL_OUT)
     print("Post-procesado listo (filas rojas + hyperlinks).")

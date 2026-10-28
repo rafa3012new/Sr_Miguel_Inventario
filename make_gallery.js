@@ -270,7 +270,13 @@ async function main() {
   const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, range: 2, defval: "" });
   // rawRows[0] is header
   const header = rawRows[0] || [];
-  const dataRows = rawRows.slice(1).filter((r) => r.some((v) => String(v ?? "").trim() !== ""));
+  const isExcludedRow = (r) => {
+  const excluded = new Set(["", "(blank)", "nan", "(en blanco)", "total general"]);
+  const tl = String(r[0] ?? "").trim().toLowerCase();
+  const st = String(r[1] ?? "").trim().toLowerCase();
+  return excluded.has(tl) || excluded.has(st);
+};
+const dataRows = rawRows.slice(1).filter((r) => r.some((v) => String(v ?? "").trim() !== "") && !isExcludedRow(r));
 
   const df = dataRows.map((r) => ({
     TLGDIV_NAME: r[0],
@@ -311,11 +317,6 @@ async function main() {
   for (const r of df) {
     const key = `${String(r.Style ?? "").trim()}||${String(r.Color_code ?? "").trim().toUpperCase()}`;
     r.Color_Name = colorNameMap[key] || "";
-  }
-
-  // hoja
-  for (let i = 0; i < df.length; i++) {
-    df[i].hoja = i < ORIGINAL_ROWS ? "sheet2" : "sheet1";
   }
 
   // image maps
@@ -385,7 +386,7 @@ async function main() {
     return na - nb;
   });
 
-  const cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", "hoja", IMAGE_COL];
+  const cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", IMAGE_COL];
 
   function isRed(row) {
     const tl = String(row.TLGDIV_NAME ?? "").trim().toLowerCase();
@@ -484,7 +485,7 @@ async function main() {
       const val = r[c];
       if (c === IMAGE_COL && typeof val === "string" && val.trim()) {
         const v = htmlEscape(val);
-        cells.push(`<td><img src="${v}" loading="lazy" alt="${htmlEscape(val)}" class="thumb" data-full="${v}" onclick="openModal(this.dataset.full)" onerror="this.style.display='none'"><br><small>${htmlEscape(val)}</small></td>`);
+        cells.push(`<td data-col='${c}'><img src="${v}" loading="lazy" alt="${htmlEscape(val)}" class="thumb" data-full="${v}" onclick="openModal(this.dataset.full)" onerror="this.style.display='none'"></td>`);
       } else {
         let v = "";
         if (val === null || val === undefined || (typeof val === "number" && isNaN(val))) v = "";
@@ -494,7 +495,7 @@ async function main() {
         } else {
           v = String(val);
         }
-        cells.push(`<td>${htmlEscape(v)}</td>`);
+        cells.push(`<td data-col='${c}'>${htmlEscape(v)}</td>`);
       }
     }
     rowsHtml.push(`<tr${trClass} ${dataAttrs.join(" ")}>${cells.join("")}</tr>`);
@@ -503,10 +504,10 @@ async function main() {
   const headerCells = [];
   for (const c of cols) {
     if (c === "#") {
-      headerCells.push("<th>#</th>");
+      headerCells.push("<th data-col='#'>#<div class='col-resizer' data-col='#'></div></th>");
     } else {
       headerCells.push(
-        `<th>${c} <span class='sortbtn' data-col='${c}' onclick='sortTable(this)' style='cursor:pointer'>&#8597;</span><br><button class='filterbtn' data-col='${c}'>Filtrar</button><div class='filterpanel' data-col='${c}' style='display:none'>${dropdowns[c]}</div></th>`
+        `<th data-col='${c}'>${c} <span class='sortbtn' data-col='${c}' onclick='sortTable(this)' style='cursor:pointer'>&#8597;</span><br><div style='height:10px; line-height:10px;'>&nbsp;</div><button class='filterbtn' data-col='${c}'>Filtrar</button><div class='filterpanel' data-col='${c}' style='display:none'>${dropdowns[c]}</div><div class='col-resizer' data-col='${c}'></div></th>`
       );
     }
   }
@@ -518,10 +519,21 @@ async function main() {
 <title>Galeria de imagenes - Inventario</title>
 <style>
 body { font-family: Arial, sans-serif; margin: 20px; }
-table { border-collapse: collapse; width: 100%; }
+table { border-collapse: collapse; width: 100%; table-layout: fixed; }
 th, td { border: 1px solid #ccc; padding: 6px; vertical-align: top; font-size: 12px; }
 th { background: #333; color: #fff; position: sticky; top: 0; }
 tr.red { background: #ffcccc; }
+.col-resizer { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 6; background: transparent; }
+.col-resizer:hover { background: rgba(255,255,255,0.35); }
+th[data-col="#"], td[data-col="#"] { width: 40px; min-width: 40px; }
+th[data-col="Color_code"], td[data-col="Color_code"] { width: 80px; min-width: 80px; }
+th[data-col="Size_Desc"], td[data-col="Size_Desc"] { width: 70px; min-width: 70px; }
+th[data-col="OTS_INV"], td[data-col="OTS_INV"] { width: 55px; min-width: 55px; }
+th[data-col="TLGDIV_NAME"], td[data-col="TLGDIV_NAME"] { width: 90px; min-width: 90px; }
+th[data-col="Style"], td[data-col="Style"] { width: 70px; min-width: 70px; }
+th[data-col="Style_Name"], td[data-col="Style_Name"] { width: 176px; min-width: 176px; }
+th[data-col="Color_Name"], td[data-col="Color_Name"] { width: 80px; min-width: 80px; }
+th[data-col="Imagen"], td[data-col="Imagen"] { width: 130px; max-width: 130px; }
 th.filtered { background: #00bcd4 !important; color: #000 !important; }
 img { max-width: 120px; max-height: 120px; object-fit: contain; }
 .sortbtn { cursor: pointer; font-size: 12px; color: #fff; user-select: none; }
@@ -544,6 +556,7 @@ select.colfilter { width: 100%; font-size: 11px; }
 <body>
 <h2>Galeria de imagenes - Inventario (${df.length} filas) <span id="rowCount" style="font-size:13px; font-weight:normal;">(mostrando ${df.length})</span></h2>
 <input type="text" id="search" placeholder="Buscar texto en toda la fila...">
+<button id="resetFilters" style="margin-left:10px; padding:8px 12px; cursor:pointer;">Reset filters</button>
 <table id="tbl">
 <thead><tr>${headerCells.join("")}</tr></thead>
 <tbody>
@@ -562,6 +575,18 @@ ${rowsHtml.join("\n")}
 <script>
 const COLS = ${JSON.stringify(cols)};
 const input=document.getElementById('search');
+function rowPassesFilters(tr, filtersToUse, q){
+  if(!tr.textContent.toLowerCase().includes(q)) return false;
+  for(const col in filtersToUse){
+    const val = tr.getAttribute('data-'+col);
+    const f = filtersToUse[col];
+    if (f instanceof Set) {
+      if (f.size === 0 || !f.has(val)) return false;
+    } else if (f && val !== f) return false;
+  }
+  return true;
+}
+
 function applyFilters(){
   const q=input.value.toLowerCase();
   const filters={};
@@ -582,7 +607,35 @@ function applyFilters(){
       }
     }
   });
-  // resaltar columnas filtradas en cyan
+
+  // Filtro cruzado (faceted): disponibilidad de checkboxes segun los demas filtros.
+  // Solo afecta habilitacion/visual, no marca como filtrada la columna.
+  const allRows = Array.from(document.querySelectorAll('#tbl tbody tr'));
+  document.querySelectorAll('.filterpanel').forEach(panel=>{
+    const targetCol = panel.dataset.col;
+    const otherFilters = {};
+    for(const c in filters){
+      if (c !== targetCol) otherFilters[c] = filters[c];
+    }
+    const available = new Set();
+    allRows.forEach(tr=>{
+      if (rowPassesFilters(tr, otherFilters, q)) {
+        available.add(tr.getAttribute('data-'+targetCol));
+      }
+    });
+    panel.querySelectorAll('.colchk').forEach(cb=>{
+      if (cb.value === '__ALL__') return;
+      const isAvailable = available.has(cb.value);
+      cb.disabled = !isAvailable;
+      const lbl = cb.parentElement;
+      if (lbl) {
+        lbl.style.opacity = isAvailable ? '1' : '0.45';
+        lbl.style.pointerEvents = isAvailable ? '' : 'none';
+      }
+    });
+  });
+
+  // Resaltar solo las columnas donde el usuario deselecciona checks (no las afectadas).
   document.querySelectorAll('th').forEach(th=>{
     const btn = th.querySelector('.filterbtn');
     const col = btn ? btn.dataset.col : null;
@@ -603,7 +656,56 @@ function applyFilters(){
   const rc = document.getElementById('rowCount');
   if(rc) rc.textContent = '(mostrando ' + visible + ' de ${df.length})';
 }
+
+// === Resize de columnas con el mouse ===
+let _resizing = null;
+document.addEventListener('mousedown', function(e){
+  const handle = (e.target && e.target.classList && e.target.classList.contains('col-resizer')) ? e.target : null;
+  if (!handle) return;
+  const th = handle.parentElement;
+  _resizing = { th: th, startX: e.clientX, startWidth: th.getBoundingClientRect().width };
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  e.preventDefault();
+  e.stopPropagation();
+});
+document.addEventListener('mousemove', function(e){
+  if (!_resizing) return;
+  const delta = e.clientX - _resizing.startX;
+  const newWidth = Math.max(60, _resizing.startWidth + delta);
+  _resizing.th.style.width = newWidth + 'px';
+  _resizing.th.style.minWidth = newWidth + 'px';
+});
+document.addEventListener('mouseup', function(){
+  if (!_resizing) return;
+  // guardar anchos
+  const widths = {};
+  document.querySelectorAll('th[data-col]').forEach(function(th){ widths[th.dataset.col] = th.getBoundingClientRect().width; });
+  try { localStorage.setItem('colWidths', JSON.stringify(widths)); } catch(err) {}
+  _resizing = null;
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+});
+// restaurar anchos guardados
+try {
+  const saved = JSON.parse(localStorage.getItem('colWidths') || '{}');
+  Object.keys(saved).forEach(function(col){
+    const th = document.querySelector('th[data-col="'+col+'"]');
+    if (th) { th.style.width = saved[col] + 'px'; th.style.minWidth = saved[col] + 'px'; }
+  });
+} catch(err) {}
+
 input.addEventListener('input', applyFilters);
+// inicializar disponibilidad cruzada al cargar
+applyFilters();
+const resetBtn = document.getElementById('resetFilters');
+if (resetBtn) {
+  resetBtn.addEventListener('click', function(){
+    input.value = '';
+    document.querySelectorAll('.filterpanel .colchk').forEach(function(b){ b.checked = true; });
+    applyFilters();
+  });
+}
 
 let sortState = { col: null, asc: true };
 function sortTable(btn){
