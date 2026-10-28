@@ -422,6 +422,7 @@ const input=document.getElementById('search');
 function applyFilters(){{
   const q=input.value.toLowerCase();
   const filters={{}};
+  const filteredCols = new Set();
   document.querySelectorAll('.filterpanel').forEach(panel=>{{
     const col = panel.dataset.col;
     const boxes = panel.querySelectorAll('.colchk');
@@ -429,11 +430,21 @@ function applyFilters(){{
     const allBox = panel.querySelector('.colchk[value="__ALL__"]');
     if (allBox && allBox.checked) {{
       // todos seleccionados -> sin filtro
-    }} else if (checked.length === 0) {{
-      filters[col] = new Set(); // nada seleccionado -> ocultar todo
     }} else {{
-      filters[col] = new Set(checked);
+      filteredCols.add(col);
+      if (checked.length === 0) {{
+        filters[col] = new Set(); // nada seleccionado -> ocultar todo
+      }} else {{
+        filters[col] = new Set(checked);
+      }}
     }}
+  }});
+  // resaltar columnas filtradas en cyan
+  document.querySelectorAll('th').forEach(th=>{{
+    const btn = th.querySelector('.filterbtn');
+    const col = btn ? btn.dataset.col : null;
+    if (col && filteredCols.has(col)) th.classList.add('filtered');
+    else th.classList.remove('filtered');
   }});
   document.querySelectorAll('#tbl tbody tr').forEach(tr=>{{
     let show = tr.textContent.toLowerCase().includes(q);
