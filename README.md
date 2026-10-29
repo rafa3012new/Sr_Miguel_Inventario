@@ -7,7 +7,7 @@ This project generates a static HTML image gallery from inventory Excel files. I
 - Static gallery (`index.html`) with a responsive table.
 - Per-column checkbox filters with cross-filtering (faceted search).
 - Sortable columns.
-- Image mapping by style number from multiple sources (Excel, PDF, XLS, ATS, and `imagenes/`).
+- Image mapping by style number from the `imagenes/` folder (brand + style first, then style).
 - Column highlighting for actively filtered columns.
 - Reset filters button.
 
@@ -18,7 +18,7 @@ This project generates a static HTML image gallery from inventory Excel files. I
 - `image_sources.py` - Image mapping rules (Excel, PDF, XLS, ATS and `imagenes/`).
 - `index.html` - Generated gallery (single entry point).
 - `sources/` - Input Excel/PDF files and additional images.
-- `imagenes/`, `imagenes_pdf/`, `imagenes_xls/`, `imagenes_ats/`, `imagenes_excel/` - Image folders.
+- `imagenes/` - Único carpeta de imagenes (todas las fuentes de imagen se consolidan aquí).
 - `requirements.txt` - Python dependencies.
 
 ## Requirements

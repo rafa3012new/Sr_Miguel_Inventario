@@ -18,7 +18,7 @@ Este proyecto genera una galeria HTML estatica a partir de archivos Excel de inv
 - `image_sources.py` - Reglas de mapeo de imagenes (Excel, PDF, XLS, ATS y `imagenes/`).
 - `index.html` - Galeria generada (punto de entrada unico).
 - `sources/` - Archivos Excel/PDF de entrada e imagenes adicionales.
-- `imagenes/`, `imagenes_pdf/`, `imagenes_xls/`, `imagenes_ats/`, `imagenes_excel/` - Carpetas de imagenes.
+- `imagenes/` - Unica carpeta de imagenes (todas las fuentes de imagen se consolidan aqui).
 - `requirements.txt` - Dependencias de Python.
 
 ## Requisitos
