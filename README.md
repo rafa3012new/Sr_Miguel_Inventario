@@ -14,8 +14,7 @@ This project generates a static HTML image gallery from inventory Excel files. I
 ## Project Structure
 
 - `make_gallery.py` - Generates `index.html` and `Inventario_con_imagenes.xlsx` (single entry point).
-- `inventory.py` - Reads the sources and builds the inventory table and the Excel output.
-- `image_sources.py` - Image mapping rules (Excel, PDF, XLS, ATS and `imagenes/`).
+- `inventory.py` - Reads the sources, maps images from `imagenes/`, and builds the inventory table and the Excel output.
 - `index.html` - Generated gallery (single entry point).
 - `sources/` - Input Excel/PDF files and additional images.
 - `imagenes/` - Único carpeta de imagenes (todas las fuentes de imagen se consolidan aquí).

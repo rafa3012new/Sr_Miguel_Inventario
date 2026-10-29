@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -5,18 +6,38 @@ from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from image_sources import build_maps, combined_image
-
 BASE = Path(__file__).resolve().parent
 EXCEL_IN = BASE / "sources" / "Inventario.xlsx"
 EXCEL_IN1 = BASE / "sources" / "Inventario-1.xlsx"
 EXCEL_OUT = BASE / "Inventario_con_imagenes.xlsx"
 SHEET_NAME = "Data"
 IMAGE_COL = "Imagen"
+IMAGES_DIR = "imagenes"
 
 SOURCE_COLUMNS = ["BRAND_NAME", "Style", "Style_Name", "Color_code",
                   "Dm_Pk", "Lbl_code", "Size_Desc", "QTY"]
 REQUIRED_COLS = ["BRAND_NAME", "Style", "Style_Name", "Color_code"]
+
+MANUAL_IMAGE_OVERRIDES = {
+    ("V322453M", "STO"): "imagenes/V322453M.jpg",
+}
+
+STYLE_IMAGE_OVERRIDES = {
+    "119004414": "imagenes/119004414.png",
+    "117004093": "imagenes/117004093.jpg",
+    "119000214": "imagenes/119000214.jpg",
+    "119000455": "imagenes/119000455.jpg",
+    "119001566": "imagenes/119001566.jpg",
+    "119001328": "imagenes/119001328.jpg",
+    "119005385": "imagenes/119005385.jpg",
+    "121000428": "imagenes/121000428.jpg",
+}
+
+
+def safe_name(s):
+    s = re.sub(r'[\\/*?:"<>|]', "_", str(s))
+    s = re.sub(r"\s+", "_", s).strip("_")
+    return (s[:50] or "item")
 
 
 def is_missing(v):
@@ -31,6 +52,35 @@ def is_missing(v):
     return s == "" or s.lower() in ("nan", "(blank)", "(en blanco)", "none", "nat")
 
 
+def extract_imagenes():
+    out_dir = BASE / IMAGES_DIR
+    mapping = {}
+    if not out_dir.exists():
+        return mapping
+    for f in sorted(out_dir.iterdir()):
+        if not f.is_file():
+            continue
+        if f.suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp"):
+            continue
+        if f.stem not in mapping:
+            mapping[f.stem] = f"{IMAGES_DIR}/{f.name}"
+    return mapping
+
+
+def combined_image(r, maps):
+    _style = str(r.get("Style", "")).strip()
+    _color = str(r.get("Color_code", "")).strip().upper()
+    _brand = str(r.get("BRAND_NAME", "")).strip()
+    if (_style, _color) in MANUAL_IMAGE_OVERRIDES:
+        return MANUAL_IMAGE_OVERRIDES[(_style, _color)]
+    if _style in STYLE_IMAGE_OVERRIDES:
+        return STYLE_IMAGE_OVERRIDES[_style]
+    brand_fname = maps.get(f"{safe_name(_brand)}_{_style}", "")
+    if brand_fname:
+        return brand_fname
+    return maps.get(_style, "")
+
+
 def load_inventory():
     df = pd.read_excel(EXCEL_IN, sheet_name=SHEET_NAME, header=2, usecols="A:H")
     if df.shape[1] != len(SOURCE_COLUMNS):
@@ -39,7 +89,7 @@ def load_inventory():
 
     missing_mask = df[REQUIRED_COLS].apply(lambda c: c.map(is_missing)).any(axis=1)
 
-    maps = build_maps()
+    maps = extract_imagenes()
     df[IMAGE_COL] = df.apply(lambda r: combined_image(r, maps), axis=1)
 
     try:
