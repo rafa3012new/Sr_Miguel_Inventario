@@ -254,7 +254,7 @@ def combined_image(r, maps):
     if _style in STYLE_IMAGE_OVERRIDES:
         return STYLE_IMAGE_OVERRIDES[_style]
     excel_fname = maps["excel"].get(
-        (str(r.get("TLGDIV_NAME", "")).strip(), _style), ""
+        (str(r.get("BRAND_NAME", "")).strip(), _style), ""
     )
     if excel_fname:
         return f"{EXCEL_IMG_DIR}/{excel_fname}"

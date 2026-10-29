@@ -13,7 +13,9 @@ Este proyecto genera una galeria HTML estatica a partir de archivos Excel de inv
 
 ## Estructura del proyecto
 
-- `make_gallery.py` - Generador en Python (recomendado).
+- `make_gallery.py` - Genera `index.html` e `Inventario_con_imagenes.xlsx` (punto de entrada unico).
+- `inventory.py` - Lee las fuentes y arma la tabla de inventario y el Excel de salida.
+- `image_sources.py` - Reglas de mapeo de imagenes (Excel, PDF, XLS, ATS y `imagenes/`).
 - `index.html` - Galeria generada (punto de entrada unico).
 - `sources/` - Archivos Excel/PDF de entrada e imagenes adicionales.
 - `imagenes/`, `imagenes_pdf/`, `imagenes_xls/`, `imagenes_ats/`, `imagenes_excel/` - Carpetas de imagenes.
@@ -36,7 +38,7 @@ python -m pip install -r requirements.txt
 python make_gallery.py
 ```
 
-Esto regenera `index.html`.
+Esto regenera `index.html` e `Inventario_con_imagenes.xlsx` desde los archivos de `sources/`. Ambos son salidas; ninguno se necesita como entrada.
 
 ## Ver la galeria
 

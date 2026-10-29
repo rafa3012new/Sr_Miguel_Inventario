@@ -1,54 +1,35 @@
 import html
 import pandas as pd
 from pathlib import Path
-from image_sources import build_maps, combined_image
+from inventory import load_inventory, write_excel
 
 BASE = Path(__file__).resolve().parent
 IMAGE_COL = "Imagen"
 
 
-df = pd.read_excel(BASE / "Inventario_con_imagenes.xlsx", sheet_name="Data")
-
-# Columna "Color_Name" mapeada desde Inventario-1.xlsx por Style + Color_code
-try:
-    _inv1 = pd.read_excel(BASE / "sources" / "Inventario-1.xlsx", sheet_name="Data")
-    _cn = {}
-    for _, _r in _inv1.iterrows():
-        _k = (str(_r.get("Style", "")).strip(), str(_r.get("Color_code", "")).strip().upper())
-        _v = _r.get("Color Name")
-        if _k not in _cn and _v is not None and str(_v).strip() != "" and str(_v).strip().lower() != "nan":
-            _cn[_k] = str(_v).strip()
-    df["Color_Name"] = df.apply(
-        lambda r: _cn.get((str(r.get("Style", "")).strip(),
-                           str(r.get("Color_code", "")).strip().upper()), ""),
-        axis=1,
-    )
-except Exception:
-    df["Color_Name"] = ""
-
+df_all, missing_mask = load_inventory()
+write_excel(df_all, missing_mask)
 
 
 # Eliminar filas en blanco / totales / (en blanco)
 def _is_excluded_row(r):
     excluded = {"", "(blank)", "nan", "(en blanco)", "total general"}
-    tl = str(r.get("TLGDIV_NAME", "")).strip().lower()
+    tl = str(r.get("BRAND_NAME", "")).strip().lower()
     st = str(r.get("Style", "")).strip().lower()
     return tl in excluded or st in excluded
 
-df = df[~df.apply(_is_excluded_row, axis=1)].reset_index(drop=True)
 
-maps = build_maps()
-df[IMAGE_COL] = df.apply(lambda r: combined_image(r, maps), axis=1)
+df = df_all[~df_all.apply(_is_excluded_row, axis=1)].reset_index(drop=True)
 
-# Ordenar por proveedor (TLGDIV_NAME) y luego por numero de estilo (Style)
-df = df.sort_values(["TLGDIV_NAME", "Style"], kind="mergesort", na_position="last").reset_index(drop=True)
+# Ordenar por marca (BRAND_NAME) y luego por numero de estilo (Style)
+df = df.sort_values(["BRAND_NAME", "Style"], kind="mergesort", na_position="last").reset_index(drop=True)
+df["No"] = range(1, len(df) + 1)
 
-
-cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", IMAGE_COL]
+cols = ["No", "BRAND_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "QTY", IMAGE_COL]
 
 
 def is_red(row):
-    return (str(row.get("TLGDIV_NAME", "")).strip().lower() in ("", "(blank)", "nan")
+    return (str(row.get("BRAND_NAME", "")).strip().lower() in ("", "(blank)", "nan")
             or str(row.get("Style", "")).strip().lower() in ("", "(blank)", "nan"))
 
 
@@ -58,7 +39,7 @@ def unique_vals(col):
     for v in df[col].tolist():
         if v is None or (isinstance(v, float) and pd.isna(v)):
             s = ""
-        elif col == "OTS_INV":
+        elif col == "QTY":
             try:
                 f = float(v)
                 s = str(int(f)) if f.is_integer() else str(f)
@@ -76,9 +57,6 @@ def unique_vals(col):
 
 dropdowns = {}
 for c in cols:
-    if c == "#":
-        dropdowns[c] = ""
-        continue
     if c == IMAGE_COL:
         vals = ["con imagen", "sin imagen"]
     else:
@@ -98,14 +76,14 @@ for i, (_, r) in enumerate(df.iterrows(), start=1):
     cells = []
     data_attrs = []
     for c in cols:
-        if c == "#":
+        if c == "No":
             val = i
             s = str(i)
         else:
             val = r.get(c)
             if val is None or (isinstance(val, float) and pd.isna(val)):
                 s = ""
-            elif c == "OTS_INV":
+            elif c == "QTY":
                 try:
                     f = float(val)
                     s = str(int(f)) if f.is_integer() else str(f)
@@ -117,8 +95,8 @@ for i, (_, r) in enumerate(df.iterrows(), start=1):
                 s = str(val).strip()
         data_attrs.append(f'data-{c}="{html.escape(s, quote=True)}"')
     for c in cols:
-        if c == "#":
-            cells.append(f"<td>{i}</td>")
+        if c == "No":
+            cells.append(f'<td data-col="No">{i}</td>')
             continue
         val = r.get(c)
         if c == IMAGE_COL and isinstance(val, str) and val.strip():
@@ -128,7 +106,7 @@ for i, (_, r) in enumerate(df.iterrows(), start=1):
         else:
             if val is None or (isinstance(val, float) and pd.isna(val)):
                 v = ""
-            elif c == "OTS_INV":
+            elif c == "QTY":
                 try:
                     f = float(val)
                     v = str(int(f)) if f.is_integer() else str(f)
@@ -141,12 +119,9 @@ for i, (_, r) in enumerate(df.iterrows(), start=1):
 
 header_cells = []
 for c in cols:
-    if c == "#":
-        header_cells.append(f"<th data-col='#'>#<div class='col-resizer' data-col='#'></div></th>")
-    else:
-        header_cells.append(
-            f"<th data-col='{c}'>{c} <span class='sortbtn' data-col='{c}' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><div style='height:10px; line-height:10px;'>&nbsp;</div><button class='filterbtn' data-col='{c}'>Filtrar</button><div class='filterpanel' data-col='{c}' style='display:none'>{dropdowns[c]}</div><div class='col-resizer' data-col='{c}'></div></th>"
-        )
+    header_cells.append(
+        f"<th data-col='{c}'>{c} <span class='sortbtn' data-col='{c}' onclick='sortTable(this)' style='cursor:pointer'>↕</span><br><div style='height:10px; line-height:10px;'>&nbsp;</div><button class='filterbtn' data-col='{c}'>Filtrar</button><div class='filterpanel' data-col='{c}' style='display:none'>{dropdowns[c]}</div><div class='col-resizer' data-col='{c}'></div></th>"
+    )
 
 html_doc = f"""<!DOCTYPE html>
 <html lang="es">
@@ -162,11 +137,11 @@ tr.red {{ background: #ffcccc; }}
 th.filtered {{ background: #00bcd4 !important; color: #000 !important; }}
 .col-resizer {{ position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 6; background: transparent; }}
 .col-resizer:hover {{ background: rgba(255,255,255,0.35); }}
-th[data-col="#"], td[data-col="#"] {{ width: 30px; min-width: 30px; }}
+th[data-col="No"], td[data-col="No"] {{ width: 30px; min-width: 30px; }}
 th[data-col="Color_code"], td[data-col="Color_code"] {{ width: 80px; min-width: 80px; }}
 th[data-col="Size_Desc"], td[data-col="Size_Desc"] {{ width: 70px; min-width: 70px; }}
-th[data-col="OTS_INV"], td[data-col="OTS_INV"] {{ width: 55px; min-width: 55px; }}
-th[data-col="TLGDIV_NAME"], td[data-col="TLGDIV_NAME"] {{ width: 90px; min-width: 90px; }}
+th[data-col="QTY"], td[data-col="QTY"] {{ width: 55px; min-width: 55px; }}
+th[data-col="BRAND_NAME"], td[data-col="BRAND_NAME"] {{ width: 90px; min-width: 90px; }}
 th[data-col="Style"], td[data-col="Style"] {{ width: 70px; min-width: 70px; }}
 th[data-col="Style_Name"], td[data-col="Style_Name"] {{ width: 176px; min-width: 176px; }}
 th[data-col="Color_Name"], td[data-col="Color_Name"] {{ width: 80px; min-width: 80px; }}
@@ -209,7 +184,7 @@ select.colfilter {{ width: 100%; font-size: 11px; }}
   </div>
 </div>
 <script>
-const COLS = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", "Imagen"];
+const COLS = ["No", "BRAND_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "QTY", "Imagen"];
 const input=document.getElementById('search');
 function rowPassesFilters(tr, filtersToUse, q){{
   if(!tr.textContent.toLowerCase().includes(q)) return false;
