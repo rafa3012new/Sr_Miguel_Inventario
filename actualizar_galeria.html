@@ -214,13 +214,16 @@
         }
 
         // Combine: keep existing, add only new (skip duplicates by style)
-        const combined = new Map(existing);
+        const combined = new Map();
         let added = 0;
         for (const item of found) {
           if (!combined.has(item.style)) {
             combined.set(item.style, item.relPath);
             added++;
           }
+        }
+        for (const [style, relPath] of existing) {
+          if (!combined.has(style)) combined.set(style, relPath);
         }
         imageMap = Array.from(combined, ([style, relPath]) => ({ style, relPath }));
 
