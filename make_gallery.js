@@ -393,16 +393,19 @@ const dataRows = rawRows.slice(1).filter((r) => r.some((v) => String(v ?? "").tr
     r[IMAGE_COL] = combinedImage(r, excelMap, pdfMap, xlsMap, atsMap, scannedImagenes);
   }
 
-  // sort by OTS_INV asc
+  // sort by provider (TLGDIV_NAME) asc, then by style number (Style) asc
   df.sort((a, b) => {
-    const va = a.OTS_INV, vb = b.OTS_INV;
-    const na = (va === null || va === undefined || va === "") ? NaN : Number(va);
-    const nb = (vb === null || vb === undefined || vb === "") ? NaN : Number(vb);
-    const aNaN = isNaN(na), bNaN = isNaN(nb);
-    if (aNaN && bNaN) return 0;
-    if (aNaN) return 1;
-    if (bNaN) return -1;
-    return na - nb;
+    const pa = (a.TLGDIV_NAME === null || a.TLGDIV_NAME === undefined) ? "" : String(a.TLGDIV_NAME).trim();
+    const pb = (b.TLGDIV_NAME === null || b.TLGDIV_NAME === undefined) ? "" : String(b.TLGDIV_NAME).trim();
+    const c1 = pa.localeCompare(pb);
+    if (c1 !== 0) return c1;
+    const sa = (a.Style === null || a.Style === undefined) ? "" : String(a.Style).trim();
+    const sb = (b.Style === null || b.Style === undefined) ? "" : String(b.Style).trim();
+    const na = Number(sa), nb = Number(sb);
+    const aNum = !isNaN(na) && sa !== "";
+    const bNum = !isNaN(nb) && sb !== "";
+    if (aNum && bNum) return na - nb;
+    return sa.localeCompare(sb);
   });
 
   const cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", IMAGE_COL];

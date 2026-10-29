@@ -288,8 +288,8 @@ df = df[~df.apply(_is_excluded_row, axis=1)].reset_index(drop=True)
 
 df[IMAGE_COL] = df.apply(combined_image, axis=1)
 
-# Ordenar por OTS_INV ascendente
-df = df.sort_values("OTS_INV", kind="mergesort", na_position="last").reset_index(drop=True)
+# Ordenar por proveedor (TLGDIV_NAME) y luego por numero de estilo (Style)
+df = df.sort_values(["TLGDIV_NAME", "Style"], kind="mergesort", na_position="last").reset_index(drop=True)
 
 
 cols = ["#", "TLGDIV_NAME", "Style", "Style_Name", "Color_code", "Color_Name", "Size_Desc", "OTS_INV", IMAGE_COL]
@@ -579,6 +579,14 @@ try {{
 input.addEventListener('input', applyFilters);
 // inicializar disponibilidad cruzada al cargar
 applyFilters();
+const resetBtn = document.getElementById('resetFilters');
+if (resetBtn) {{
+  resetBtn.addEventListener('click', function(){{
+    input.value = '';
+    document.querySelectorAll('.filterpanel .colchk').forEach(function(b){{ b.checked = true; }});
+    applyFilters();
+  }});
+}}
 
 let sortState = {{ col: null, asc: true }};
 function sortTable(btn){{
