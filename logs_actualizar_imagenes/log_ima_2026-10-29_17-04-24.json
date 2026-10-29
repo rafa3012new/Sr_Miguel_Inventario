@@ -1,0 +1,28 @@
+{
+  "fecha": "2026-10-29",
+  "archivo": "index.html",
+  "generado": "2026-10-29T21:04:24.891Z",
+  "imagenes_agregadas": 5,
+  "imagenes": [
+    {
+      "style": "117003876",
+      "ruta": "imagenes/117003876.jpg"
+    },
+    {
+      "style": "117003879",
+      "ruta": "imagenes/117003879.jpg"
+    },
+    {
+      "style": "117005131",
+      "ruta": "imagenes/117005131.jpg"
+    },
+    {
+      "style": "Q022053",
+      "ruta": "imagenes/Q022053.jpg"
+    },
+    {
+      "style": "Q822053",
+      "ruta": "imagenes/Q822053.jpg"
+    }
+  ]
+}

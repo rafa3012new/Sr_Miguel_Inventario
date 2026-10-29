@@ -268,9 +268,29 @@
         const verifyText = await verifyFile.text();
         const ok = (verifyText === updatedText);
         if (ok) {
+          const pruebaHandle = await dirHandle.getFileHandle('index_prueba.html', { create: true });
+          const pruebaWritable = await pruebaHandle.createWritable();
+          await pruebaWritable.write(updatedText);
+          await pruebaWritable.close();
           newImages.forEach(item => existingStyles.add(item.style));
           btnWrite.disabled = true;
-          setStatus('index.html actualizado con ' + newImages.length + ' imagen(es) nueva(s). Recarga la pagina (Ctrl+F5).', 'success');
+          const ahora = new Date();
+          const fecha = ahora.toISOString().slice(0, 10);
+          const hora = [ahora.getHours(), ahora.getMinutes(), ahora.getSeconds()].map(n => String(n).padStart(2, '0')).join('-');
+          const nombreLog = 'log_ima_' + fecha + '_' + hora + '.json';
+          const log = {
+            fecha,
+            archivo: 'index.html',
+            generado: ahora.toISOString(),
+            imagenes_agregadas: newImages.length,
+            imagenes: newImages.map(item => ({ style: item.style, ruta: item.relPath }))
+          };
+          const logDir = await dirHandle.getDirectoryHandle('logs_actualizar_imagenes', { create: true });
+          const logFile = await logDir.getFileHandle(nombreLog, { create: true });
+          const logWritable = await logFile.createWritable();
+          await logWritable.write(JSON.stringify(log, null, 2));
+          await logWritable.close();
+          setStatus('index.html e index_prueba.html actualizados con ' + newImages.length + ' imagen(es) nueva(s). Log: logs_actualizar_imagenes\\' + nombreLog + '. Recarga la pagina (Ctrl+F5).', 'success');
         } else {
           setStatus('La escritura no se reflejo. verifyLen=' + verifyText.length + ' expected=' + updatedText.length, 'danger');
           console.error('verify mismatch', { lenOrig: originalText.length, lenNew: updatedText.length, lenVerify: verifyText.length, equal: ok });

@@ -1,0 +1,67 @@
+{
+  "fecha": "2026-10-29",
+  "archivo": "index_prueba.html",
+  "generado": "2026-10-29T20:45:05.345Z",
+  "agregados": 3,
+  "actualizados": 0,
+  "excluidos": 0,
+  "rechazados": 1,
+  "registros": [
+    {
+      "fila": 2,
+      "estado": "agregado",
+      "motivo": "",
+      "BRAND_NAME": "NAUTICA CLASSICS",
+      "Style": "1791181",
+      "Color_code": "BLK",
+      "Size_Desc": "S",
+      "Dm_Pk": "",
+      "Lbl_code": "",
+      "Loc": "NJ",
+      "QTY": "10",
+      "Fecha_ingreso_QTY": "2026-10-29"
+    },
+    {
+      "fila": 27,
+      "estado": "agregado",
+      "motivo": "",
+      "BRAND_NAME": "NAUTICA CLASSICS",
+      "Style": "Q621885",
+      "Color_code": "NSS",
+      "Size_Desc": "L",
+      "Dm_Pk": "",
+      "Lbl_code": "",
+      "Loc": "NJ",
+      "QTY": "5",
+      "Fecha_ingreso_QTY": "2026-10-29"
+    },
+    {
+      "fila": 69,
+      "estado": "agregado",
+      "motivo": "",
+      "BRAND_NAME": "NAUTICA CLASSICS",
+      "Style": "117003891",
+      "Color_code": "NSS",
+      "Size_Desc": "XL",
+      "Dm_Pk": "",
+      "Lbl_code": "",
+      "Loc": "NJ",
+      "QTY": "4",
+      "Fecha_ingreso_QTY": "2026-10-29"
+    },
+    {
+      "fila": 100,
+      "estado": "rechazado",
+      "motivo": "Vacio: Color_code",
+      "BRAND_NAME": "NAUTICA CLASSICS",
+      "Style": "117004822",
+      "Color_code": "",
+      "Size_Desc": "L",
+      "Dm_Pk": "",
+      "Lbl_code": "",
+      "Loc": "NJ",
+      "QTY": "7",
+      "Fecha_ingreso_QTY": "2026-10-29"
+    }
+  ]
+}
