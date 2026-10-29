@@ -1,224 +1,11 @@
 import html
-import re
 import pandas as pd
 from pathlib import Path
-from openpyxl import load_workbook
-
-try:
-    import pymupdf
-except Exception:
-    pymupdf = None
+from image_sources import build_maps, combined_image
 
 BASE = Path(__file__).resolve().parent
 IMAGE_COL = "Imagen"
-EXCEL_IMG_SRC = "NAUTICA ATS TOM .xlsx"
-EXCEL_IMG_DIR = "imagenes_excel"
-PDF_IMG_SRC = "MMX FALL ATS 6.23 LEVY GROUP 3.pdf"
-PDF_IMG_SRC2 = "LAUNDRY EARLY BUY LINESHEET 3.18.pdf"
-PDF_IMG_DIR = "imagenes_pdf"
-XLS_IMG_DIR = "imagenes_xls"
-ATS_IMG_DIR = "imagenes_ats"
 
-
-def safe_name(s):
-    s = re.sub(r'[\\/*?:"<>|]', "_", str(s))
-    s = re.sub(r"\s+", "_", s).strip("_")
-    return (s[:50] or "item")
-
-
-def extract_excel_images():
-    src = BASE / EXCEL_IMG_SRC
-    out_dir = BASE / EXCEL_IMG_DIR
-    out_dir.mkdir(exist_ok=True)
-    mapping = {}
-    if not src.exists():
-        return mapping
-    wb = load_workbook(src)
-    ws = wb["Sheet"] if "Sheet" in wb.sheetnames else wb.worksheets[1]
-    for im in ws._images:
-        anchor = im.anchor
-        from_cell = getattr(anchor, "_from", None)
-        if from_cell is None:
-            continue
-        excel_row = from_cell.row + 1
-        tl = ws.cell(row=excel_row, column=1).value
-        style = ws.cell(row=excel_row, column=2).value
-        if tl is None or style is None:
-            continue
-        style_s = str(style).strip()
-        if "total" in style_s.lower():
-            continue
-        key = (str(tl).strip(), style_s)
-        fname = f"excel_{safe_name(tl)}_{safe_name(style)}.png"
-        dest = out_dir / fname
-        if not dest.exists():
-            try:
-                dest.write_bytes(im._data())
-            except Exception:
-                continue
-        mapping[key] = fname
-    return mapping
-
-
-def extract_pdf_images():
-    src = BASE / PDF_IMG_SRC
-    out_dir = BASE / PDF_IMG_DIR
-    out_dir.mkdir(exist_ok=True)
-    mapping = {}
-    if pymupdf is None or not src.exists():
-        return mapping
-    doc = pymupdf.open(src)
-    candidates = {}
-    for pno in range(doc.page_count):
-        page = doc[pno]
-        style_blocks = []
-        for b in page.get_text("blocks"):
-            x0, y0, x1, y1, txt = b[:5]
-            txt = txt.strip()
-            m = re.search(r"\b(\d{7,})\b", txt)
-            if m and x0 > 180:
-                style_blocks.append((y0, y1, m.group(1)))
-        for img in page.get_images(full=True):
-            for r in page.get_image_rects(img[0]):
-                styles = {sb[2] for sb in style_blocks if not (sb[1] < r.y0 or sb[0] > r.y1)}
-                for st in styles:
-                    candidates.setdefault(st, []).append((r.x0, r.y0, img[0]))
-    for style, cands in candidates.items():
-        cands_sorted = sorted(cands, key=lambda c: (c[0], c[1]))
-        _, _, xref = cands_sorted[0]
-        base = doc.extract_image(xref)
-        ext = base.get("ext", "png")
-        fname = f"pdf_{safe_name(style)}.{ext}"
-        dest = out_dir / fname
-        if not dest.exists():
-            try:
-                dest.write_bytes(base["image"])
-            except Exception:
-                continue
-        mapping[style] = fname
-    doc.close()
-    return mapping
-
-
-def extract_pdf_images2():
-    src = BASE / PDF_IMG_SRC2
-    out_dir = BASE / PDF_IMG_DIR
-    out_dir.mkdir(exist_ok=True)
-    mapping = {}
-    if pymupdf is None or not src.exists():
-        return mapping
-    doc = pymupdf.open(src)
-    used = set()
-    for pno in range(doc.page_count):
-        page = doc[pno]
-        styles = []
-        for b in page.get_text("blocks"):
-            x0, y0, x1, y1, txt = b[:5]
-            m = re.search(r"\b(\d{7,})\b", txt.strip())
-            if m:
-                styles.append((m.group(1), (x0 + x1) / 2, y0, y1))
-        imgs = []
-        for img in page.get_images(full=True):
-            for r in page.get_image_rects(img[0]):
-                imgs.append((img[0], (r.x0 + r.x1) / 2, r.y0, r.y1))
-        for style, scx, sy0, sy1 in styles:
-            cands = []
-            for xref, icx, iy0, iy1 in imgs:
-                if xref in used:
-                    continue
-                if iy0 >= sy1 - 5 and abs(icx - scx) <= 90:
-                    cands.append((abs(iy0 - sy1) + abs(icx - scx) * 0.5, xref))
-            if cands:
-                cands.sort()
-                xref = cands[0][1]
-                used.add(xref)
-                base = doc.extract_image(xref)
-                ext = base.get("ext", "png")
-                fname = f"pdf_{safe_name(style)}.{ext}"
-                dest = out_dir / fname
-                if not dest.exists():
-                    try:
-                        dest.write_bytes(base["image"])
-                    except Exception:
-                        continue
-                mapping[style] = fname
-    doc.close()
-    return mapping
-
-
-def extract_xls_images():
-    out_dir = BASE / XLS_IMG_DIR
-    mapping = {}
-    if not out_dir.exists():
-        return mapping
-    for f in out_dir.iterdir():
-        if not f.is_file():
-            continue
-        name = f.name
-        if not name.startswith("xls_") or not name.lower().endswith((".png", ".jpg", ".jpeg")):
-            continue
-        key = name[4:].rsplit(".", 1)[0]
-        mapping[key] = f"{XLS_IMG_DIR}/{name}"
-    if "V623040" in mapping:
-        mapping.setdefault("V623040A", mapping["V623040"])
-        mapping.setdefault("V623040H", mapping["V623040"])
-    return mapping
-
-
-def extract_ats_images():
-    out_dir = BASE / ATS_IMG_DIR
-    mapping = {}
-    if not out_dir.exists():
-        return mapping
-    # Collect per style, pick the lowest trailing index
-    by_style = {}
-    for f in out_dir.iterdir():
-        if not f.is_file():
-            continue
-        name = f.name
-        if not name.startswith("ATS_") or not name.lower().endswith((".png", ".jpg", ".jpeg")):
-            continue
-        stem = name[4:].rsplit(".", 1)[0]  # style_color_index
-        parts = stem.split("_")
-        if len(parts) < 2:
-            continue
-        style = parts[0]
-        idx = 0
-        if len(parts) >= 3 and parts[-1].isdigit():
-            idx = int(parts[-1])
-        by_style.setdefault(style, []).append((idx, name))
-    for style, cands in by_style.items():
-        cands.sort()
-        mapping[style] = f"{ATS_IMG_DIR}/{cands[0][1]}"
-    return mapping
-
-image_map = extract_excel_images()
-pdf_map = extract_pdf_images()
-# Agregar imagenes del nuevo PDF sin sobrescribir las existentes
-for _k, _v in extract_pdf_images2().items():
-    pdf_map.setdefault(_k, _v)
-
-xls_map = extract_xls_images()
-ats_map = extract_ats_images()
-
-
-def extract_imagenes():
-    out_dir = BASE / "imagenes"
-    mapping = {}
-    if not out_dir.exists():
-        return mapping
-    for f in out_dir.iterdir():
-        if not f.is_file():
-            continue
-        if f.suffix.lower() not in (".png", ".jpg", ".jpeg"):
-            continue
-        stem = f.stem
-        if stem not in mapping:
-            mapping[stem] = f"imagenes/{f.name}"
-    return mapping
-
-
-imagenes_map = extract_imagenes()
 
 df = pd.read_excel(BASE / "Inventario_con_imagenes.xlsx", sheet_name="Data")
 
@@ -241,42 +28,6 @@ except Exception:
 
 
 
-# Mapeos manuales de imagenes por estilo + color (sobrescriben el resto)
-MANUAL_IMAGE_OVERRIDES = {
-    ("V322453M", "STO"): "V322453M_COLOR_STONE.png",
-}
-
-def combined_image(r):
-    _style = str(r.get("Style", "")).strip()
-    _color = str(r.get("Color_code", "")).strip().upper()
-    if (_style, _color) in MANUAL_IMAGE_OVERRIDES:
-        return MANUAL_IMAGE_OVERRIDES[(_style, _color)]
-    # Imagen descargada de Rainforest/Amazon para este style
-    if _style == "119004414":
-        return "imagenes/119004414.png"
-    if _style == "117004093":
-        return "imagenes/117004093.jpg"
-    excel_fname = image_map.get(
-        (str(r.get("TLGDIV_NAME", "")).strip(), str(r.get("Style", "")).strip()), ""
-    )
-    if excel_fname:
-        return f"{EXCEL_IMG_DIR}/{excel_fname}"
-    pdf_fname = pdf_map.get(str(r.get("Style", "")).strip(), "")
-    if pdf_fname:
-        return f"{PDF_IMG_DIR}/{pdf_fname}"
-    xls_fname = xls_map.get(str(r.get("Style", "")).strip(), "")
-    if xls_fname:
-        return xls_fname
-    ats_fname = ats_map.get(str(r.get("Style", "")).strip(), "")
-    if ats_fname:
-        return ats_fname
-    # Imagenes de la carpeta \imagenes, solo si no hay otra ya mapeada.
-    img_fname = imagenes_map.get(str(r.get("Style", "")).strip())
-    if img_fname:
-        return img_fname
-    return ""
-
-
 # Eliminar filas en blanco / totales / (en blanco)
 def _is_excluded_row(r):
     excluded = {"", "(blank)", "nan", "(en blanco)", "total general"}
@@ -286,7 +37,8 @@ def _is_excluded_row(r):
 
 df = df[~df.apply(_is_excluded_row, axis=1)].reset_index(drop=True)
 
-df[IMAGE_COL] = df.apply(combined_image, axis=1)
+maps = build_maps()
+df[IMAGE_COL] = df.apply(lambda r: combined_image(r, maps), axis=1)
 
 # Ordenar por proveedor (TLGDIV_NAME) y luego por numero de estilo (Style)
 df = df.sort_values(["TLGDIV_NAME", "Style"], kind="mergesort", na_position="last").reset_index(drop=True)

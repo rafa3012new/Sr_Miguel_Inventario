@@ -14,17 +14,14 @@ Este proyecto genera una galeria HTML estatica a partir de archivos Excel de inv
 ## Estructura del proyecto
 
 - `make_gallery.py` - Generador en Python (recomendado).
-- `make_gallery.js` - Generador en Node.js (alternativa).
 - `index.html` - Galeria generada (punto de entrada unico).
 - `sources/` - Archivos Excel/PDF de entrada e imagenes adicionales.
 - `imagenes/`, `imagenes_pdf/`, `imagenes_xls/`, `imagenes_ats/`, `imagenes_excel/` - Carpetas de imagenes.
-- `image_maps.json` - Mapeos de imagenes en cache (generado).
 - `requirements.txt` - Dependencias de Python.
 
 ## Requisitos
 
 - Python 3.12 (recomendado) con `pandas`, `openpyxl`, etc.
-  - O Node.js (para el generador JS).
 - Archivos de entrada en `sources/` (por ejemplo `Inventario_con_imagenes.xlsx`, `Inventario-1.xlsx`).
 
 ## Instalacion (Python)
@@ -41,13 +38,6 @@ python make_gallery.py
 
 Esto regenera `index.html`.
 
-## Generar la galeria (Node.js, alternativa)
-
-```bash
-npm install
-node make_gallery.js
-```
-
 ## Ver la galeria
 
 Abre `index.html` en tu navegador.
@@ -62,7 +52,7 @@ El sitio se servira desde `index.html` automaticamente.
 
 ## Notas
 
-- `node_modules/` y caches generados estan ignorados por Git (ver `.gitignore`).
+- Caches generados estan ignorados por Git (ver `.gitignore`).
 - Si agregas nuevas imagenes a `imagenes/`, regenera la galeria para incluirlas.
 - El generador Python escribe directamente en `index.html` (sin `galeria.html` separado).
 
